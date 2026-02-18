@@ -1,164 +1,165 @@
-const gamesEl = document.getElementById('games');
-const form = document.getElementById('createGameForm');
-const statusEl = document.getElementById('status');
 const apiBaseInputEl = document.getElementById('apiBaseUrl');
 const saveApiConfigBtn = document.getElementById('saveApiConfig');
+const sessionIdInputEl = document.getElementById('sessionIdInput');
+const loadSessionBtn = document.getElementById('loadSession');
+const closeSessionBtn = document.getElementById('closeSession');
+const statusEl = document.getElementById('status');
+
+const gameTitleEl = document.getElementById('gameTitle');
+const gameOptionsEl = document.getElementById('gameOptions');
+const sessionStateEl = document.getElementById('sessionState');
+const resultPanelEl = document.getElementById('resultPanel');
+const resultAEl = document.getElementById('resultA');
+const resultBEl = document.getElementById('resultB');
+const resultSummaryEl = document.getElementById('resultSummary');
 const logsEl = document.getElementById('logs');
+
+let currentSessionId = '';
+let fanfarePlayedForSession = '';
 
 function log(message) {
   const now = new Date().toLocaleTimeString('ko-KR');
   logsEl.textContent = `[${now}] ${message}\n${logsEl.textContent}`.slice(0, 10000);
 }
 
-function formatDate(value) {
-  return new Date(value).toLocaleString('ko-KR');
+function setStatus(text) {
+  statusEl.textContent = text;
 }
 
-function participantJoinUrl(sessionId) {
-  const url = new URL('participant.html', window.location.href);
-  url.searchParams.set('session', sessionId);
-  return url.toString();
+function hideResultPanel() {
+  resultPanelEl.classList.add('hidden');
+  resultAEl.textContent = 'A: -';
+  resultBEl.textContent = 'B: -';
+  resultSummaryEl.textContent = '-';
 }
 
-async function fetchGames() {
-  const data = await window.AorBApi.listGames();
-  return data.games || [];
-}
-
-async function createGame(payload) {
-  await window.AorBApi.createGame(payload.title, payload.optionA, payload.optionB);
-}
-
-async function startSession(gameId) {
-  await window.AorBApi.startSession(gameId);
-}
-
-async function closeSession(sessionId) {
-  await window.AorBApi.closeSession(sessionId);
-}
-
-function sessionTemplate(session) {
-  const sessionUrl = participantJoinUrl(session.id);
-  const statusClass = session.status === 'active' ? 'active' : 'closed';
-  const statusText = session.status === 'active' ? '진행 중' : '종료됨';
-  const closeButton = session.status === 'active'
-    ? `<button class="danger" data-action="close-session" data-session-id="${session.id}">세션 종료 및 결과 공개</button>`
-    : '';
-
-  return `
-    <div class="card stack">
-      <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem;">
-        <span class="tag ${statusClass}">${statusText}</span>
-        <span class="small">세션 ID: ${session.id}</span>
-      </div>
-      <div class="kpi">
-        <div class="a">A: ${session.votes.A}</div>
-        <div class="b">B: ${session.votes.B}</div>
-      </div>
-      <p class="small">총 응답: ${session.totalVotes}명 · 시작: ${formatDate(session.createdAt)}</p>
-      <a class="session-link" href="${sessionUrl}" target="_blank" rel="noreferrer">${sessionUrl}</a>
-      <canvas id="qr-${session.id}" width="150" height="150"></canvas>
-      ${closeButton}
-    </div>
-  `;
-}
-
-function gameTemplate(game) {
-  const sessionList = game.sessions.length
-    ? game.sessions.map((session) => sessionTemplate(session)).join('')
-    : '<p class="small">아직 세션이 없습니다. 새 세션을 시작하세요.</p>';
-
-  return `
-    <article class="card stack">
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem;">
-        <div class="stack" style="gap:0.3rem;">
-          <h3>${game.title}</h3>
-          <p class="small">A: ${game.optionA} / B: ${game.optionB}</p>
-          <p class="small">생성: ${formatDate(game.createdAt)}</p>
-        </div>
-        <button data-action="start-session" data-game-id="${game.id}">새 세션 시작</button>
-      </div>
-      <div class="grid grid-2">${sessionList}</div>
-    </article>
-  `;
-}
-
-function renderGames(games) {
-  if (!games.length) {
-    gamesEl.innerHTML = '<section class="card"><p class="small">저장된 게임이 없습니다.</p></section>';
+function playFanfare() {
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) {
+    log('브라우저가 오디오 컨텍스트를 지원하지 않아 빵빠레를 재생할 수 없습니다.');
     return;
   }
 
-  gamesEl.innerHTML = games.map(gameTemplate).join('');
+  const ctx = new AudioCtx();
+  const notes = [523.25, 659.25, 783.99, 1046.5, 783.99, 1046.5];
+  const start = ctx.currentTime;
 
-  games.forEach((game) => {
-    game.sessions.forEach((session) => {
-      const canvas = document.getElementById(`qr-${session.id}`);
-      if (!canvas || !window.QRCode) return;
-      window.QRCode.toCanvas(canvas, participantJoinUrl(session.id), { width: 150, margin: 1 }, () => {});
-    });
+  notes.forEach((freq, idx) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+
+    gain.gain.setValueAtTime(0.0001, start + idx * 0.15);
+    gain.gain.exponentialRampToValueAtTime(0.22, start + idx * 0.15 + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + idx * 0.15 + 0.14);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(start + idx * 0.15);
+    osc.stop(start + idx * 0.15 + 0.14);
   });
 }
 
-async function refreshGames() {
-  try {
-    const games = await fetchGames();
-    renderGames(games);
-  } catch (error) {
-    statusEl.textContent = error.message;
-    log(`오류: ${error.message}`);
+function showClosedResult(data) {
+  resultPanelEl.classList.remove('hidden');
+  resultAEl.textContent = `A: ${data.session.votes.A}`;
+  resultBEl.textContent = `B: ${data.session.votes.B}`;
+  resultSummaryEl.textContent = `총 ${data.session.totalVotes}명 참여 · 세션 종료됨`;
+
+  if (fanfarePlayedForSession !== data.session.id) {
+    playFanfare();
+    fanfarePlayedForSession = data.session.id;
+    log('세션 종료! 결과 공개와 함께 빵빠레를 재생했습니다.');
   }
 }
 
-form.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const formData = new FormData(form);
-  const title = String(formData.get('title')).trim();
-  const optionA = String(formData.get('optionA')).trim();
-  const optionB = String(formData.get('optionB')).trim();
+async function loadSession(sessionId) {
+  if (!sessionId) {
+    setStatus('세션 ID를 입력해 주세요.');
+    return;
+  }
 
   try {
-    await createGame({ title, optionA, optionB });
-    form.reset();
-    statusEl.textContent = '게임이 저장되었습니다.';
-    log(`게임 저장 완료: ${title}`);
-    await refreshGames();
-  } catch (error) {
-    statusEl.textContent = error.message;
-    log(`게임 저장 실패: ${error.message}`);
-  }
-});
+    const data = await window.AorBApi.getSession(sessionId);
+    currentSessionId = sessionId;
+    sessionIdInputEl.value = sessionId;
 
-gamesEl.addEventListener('click', async (event) => {
-  const button = event.target.closest('button[data-action]');
-  if (!button) return;
+    gameTitleEl.textContent = data.game.title;
+    gameOptionsEl.textContent = `A: ${data.game.optionA} / B: ${data.game.optionB}`;
+    sessionStateEl.textContent = `진행 상태: ${data.session.status === 'active' ? '진행 중' : '종료됨'}`;
 
-  const { action } = button.dataset;
-  try {
-    if (action === 'start-session') {
-      await startSession(button.dataset.gameId);
-      log(`세션 시작 완료 (gameId: ${button.dataset.gameId})`);
+    if (data.session.status === 'closed') {
+      showClosedResult(data);
+      closeSessionBtn.disabled = true;
+      setStatus('종료된 세션입니다. 결과를 확인하세요.');
+    } else {
+      hideResultPanel();
+      closeSessionBtn.disabled = false;
+      setStatus('진행 중인 세션입니다. 종료 전에는 결과를 확인할 수 없습니다.');
     }
-    if (action === 'close-session') {
-      await closeSession(button.dataset.sessionId);
-      log(`세션 종료 완료 (sessionId: ${button.dataset.sessionId})`);
-    }
-    await refreshGames();
   } catch (error) {
-    statusEl.textContent = error.message;
-    log(`요청 실패: ${error.message}`);
+    setStatus(error.message);
+    log(`세션 로드 실패: ${error.message}`);
   }
-});
+}
+
+async function pollCurrentSession() {
+  if (!currentSessionId) return;
+  await loadSession(currentSessionId);
+}
 
 saveApiConfigBtn.addEventListener('click', async () => {
   const saved = window.AorBConfig.setApiBaseUrl(apiBaseInputEl.value);
   apiBaseInputEl.value = saved;
-  statusEl.textContent = 'Google Apps Script URL이 저장되었습니다.';
   log('Google Apps Script URL 저장 완료');
-  await refreshGames();
+
+  if (currentSessionId) {
+    await loadSession(currentSessionId);
+  }
+});
+
+loadSessionBtn.addEventListener('click', async () => {
+  const sessionId = sessionIdInputEl.value.trim();
+  fanfarePlayedForSession = '';
+  await loadSession(sessionId);
+  log(`세션 로드 요청: ${sessionId || '(빈 값)'}`);
+});
+
+closeSessionBtn.addEventListener('click', async () => {
+  if (!currentSessionId) {
+    setStatus('먼저 세션을 불러와 주세요.');
+    return;
+  }
+
+  const yes = window.confirm('세션을 종료하고 결과를 공개할까요? 종료 후 되돌릴 수 없습니다.');
+  if (!yes) return;
+
+  try {
+    await window.AorBApi.closeSession(currentSessionId);
+    log(`세션 종료 완료: ${currentSessionId}`);
+    await loadSession(currentSessionId);
+  } catch (error) {
+    setStatus(error.message);
+    log(`세션 종료 실패: ${error.message}`);
+  }
 });
 
 apiBaseInputEl.value = window.AorBConfig.getApiBaseUrl();
-log('HOST 페이지 준비 완료');
-refreshGames();
-setInterval(refreshGames, 5000);
+
+const initialSession = new URLSearchParams(window.location.search).get('session');
+const queryApi = new URLSearchParams(window.location.search).get('api');
+if (queryApi) {
+  const saved = window.AorBConfig.setApiBaseUrl(queryApi);
+  apiBaseInputEl.value = saved;
+}
+
+if (initialSession) {
+  sessionIdInputEl.value = initialSession;
+  loadSession(initialSession);
+}
+
+hideResultPanel();
+log('HOST 세션 진행 페이지 준비 완료');
+setInterval(pollCurrentSession, 5000);

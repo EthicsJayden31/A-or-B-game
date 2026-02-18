@@ -17,7 +17,6 @@
     try {
       response = await fetch(baseUrl, {
         method: 'POST',
-        // Apps Script CORS/preflight 이슈를 줄이기 위해 simple request로 전송
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ action, ...payload }),
       });
@@ -46,8 +45,14 @@
     createGame(title, optionA, optionB) {
       return call('createGame', { title, optionA, optionB });
     },
+    deleteGame(gameId) {
+      return call('deleteGame', { gameId });
+    },
     startSession(gameId) {
       return call('startSession', { gameId });
+    },
+    deleteSession(sessionId) {
+      return call('deleteSession', { sessionId });
     },
     closeSession(sessionId) {
       return call('closeSession', { sessionId });

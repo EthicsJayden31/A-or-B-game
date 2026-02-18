@@ -17,7 +17,7 @@ function doPost(e) {
     const result = route(body);
     return jsonResponse(result);
   } catch (error) {
-    return jsonResponse({ ok: false, error: error.message || 'Unknown error' }, 400);
+    return jsonResponse({ ok: false, error: error.message || 'Unknown error' });
   }
 }
 
@@ -30,8 +30,14 @@ function route(body) {
       return { ok: true, games: listGames() };
     case 'createGame':
       return { ok: true, game: createGame(body) };
+    case 'deleteGame':
+      deleteGame(body);
+      return { ok: true };
     case 'startSession':
       return { ok: true, session: startSession(body) };
+    case 'deleteSession':
+      deleteSession(body);
+      return { ok: true };
     case 'closeSession':
       return { ok: true, ...closeSession(body) };
     case 'getSession':
@@ -74,13 +80,15 @@ function listGames() {
   const byGame = {};
   sessionRows.forEach((s) => {
     if (!byGame[s.gameId]) byGame[s.gameId] = [];
+    const isClosed = s.status === 'closed';
     byGame[s.gameId].push({
       id: s.id,
       status: s.status,
       createdAt: s.createdAt,
       closedAt: s.closedAt || null,
-      votes: { A: Number(s.votesA || 0), B: Number(s.votesB || 0) },
-      totalVotes: Number(s.votesA || 0) + Number(s.votesB || 0),
+      votes: isClosed ? { A: Number(s.votesA || 0), B: Number(s.votesB || 0) } : { A: null, B: null },
+      totalVotes: isClosed ? Number(s.votesA || 0) + Number(s.votesB || 0) : null,
+      resultVisible: isClosed,
     });
   });
 
@@ -112,6 +120,31 @@ function createGame(body) {
   return game;
 }
 
+function deleteGame(body) {
+  const gameId = String(body.gameId || '');
+  if (!gameId) throw new Error('gameId가 필요합니다.');
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+
+  try {
+    const { games, sessions, votes } = getSheets_();
+    const gameRows = readRows_(games);
+    const sessionRows = readRows_(sessions);
+
+    const gameIndex = gameRows.findIndex((g) => g.id === gameId);
+    if (gameIndex < 0) throw new Error('게임을 찾지 못했습니다.');
+
+    const sessionIds = sessionRows.filter((s) => s.gameId === gameId).map((s) => s.id);
+
+    deleteRowsByPredicate_(votes, (r) => sessionIds.indexOf(String(r.sessionId)) >= 0);
+    deleteRowsByPredicate_(sessions, (r) => String(r.gameId) === gameId);
+    deleteRowsByPredicate_(games, (r) => String(r.id) === gameId);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function startSession(body) {
   const gameId = String(body.gameId || '');
   if (!gameId) throw new Error('gameId가 필요합니다.');
@@ -137,9 +170,30 @@ function startSession(body) {
     status: session.status,
     createdAt: session.createdAt,
     closedAt: null,
-    votes: { A: 0, B: 0 },
-    totalVotes: 0,
+    votes: { A: null, B: null },
+    totalVotes: null,
+    resultVisible: false,
   };
+}
+
+function deleteSession(body) {
+  const sessionId = String(body.sessionId || '');
+  if (!sessionId) throw new Error('sessionId가 필요합니다.');
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+
+  try {
+    const { sessions, votes } = getSheets_();
+    const sessionRows = readRows_(sessions);
+    const exists = sessionRows.find((s) => s.id === sessionId);
+    if (!exists) throw new Error('세션을 찾지 못했습니다.');
+
+    deleteRowsByPredicate_(votes, (r) => String(r.sessionId) === sessionId);
+    deleteRowsByPredicate_(sessions, (r) => String(r.id) === sessionId);
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function closeSession(body) {
@@ -185,6 +239,8 @@ function getSession(body) {
   const game = gameRows.find((g) => g.id === session.gameId);
   if (!game) throw new Error('게임을 찾지 못했습니다.');
 
+  const isClosed = session.status === 'closed';
+
   return {
     game: {
       id: game.id,
@@ -195,8 +251,9 @@ function getSession(body) {
     session: {
       id: session.id,
       status: session.status,
-      votes: { A: Number(session.votesA || 0), B: Number(session.votesB || 0) },
-      totalVotes: Number(session.votesA || 0) + Number(session.votesB || 0),
+      votes: isClosed ? { A: Number(session.votesA || 0), B: Number(session.votesB || 0) } : { A: null, B: null },
+      totalVotes: isClosed ? Number(session.votesA || 0) + Number(session.votesB || 0) : null,
+      resultVisible: isClosed,
       createdAt: session.createdAt,
       closedAt: session.closedAt || null,
     },
@@ -239,6 +296,15 @@ function vote(body) {
   }
 }
 
+function deleteRowsByPredicate_(sheet, predicate) {
+  const rows = readRows_(sheet);
+  for (let i = rows.length - 1; i >= 0; i -= 1) {
+    if (predicate(rows[i])) {
+      sheet.deleteRow(i + 2);
+    }
+  }
+}
+
 function readRows_(sheet) {
   const values = sheet.getDataRange().getValues();
   if (values.length <= 1) return [];
@@ -253,11 +319,8 @@ function readRows_(sheet) {
   });
 }
 
-function jsonResponse(payload, statusCode) {
-  const output = ContentService
+function jsonResponse(payload) {
+  return ContentService
     .createTextOutput(JSON.stringify(payload))
     .setMimeType(ContentService.MimeType.JSON);
-
-  // Apps Script ContentService는 status code 지정이 제한적이므로 payload.ok로 실패를 표시합니다.
-  return output;
 }

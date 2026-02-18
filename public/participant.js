@@ -1,5 +1,9 @@
 const params = new URLSearchParams(window.location.search);
 const sessionId = params.get('session');
+const queryApi = params.get('api');
+if (queryApi) {
+  window.AorBConfig.setApiBaseUrl(queryApi);
+}
 
 const titleEl = document.getElementById('title');
 const optionsEl = document.getElementById('options');
@@ -7,8 +11,6 @@ const messageEl = document.getElementById('message');
 const choiceAreaEl = document.getElementById('choiceArea');
 const choiceAEl = document.getElementById('choiceA');
 const choiceBEl = document.getElementById('choiceB');
-const apiBaseInputEl = document.getElementById('apiBaseUrl');
-const saveApiConfigBtn = document.getElementById('saveApiConfig');
 
 let localSession;
 const participantTokenKey = `aorb-${sessionId || 'unknown'}`;
@@ -86,15 +88,8 @@ async function pollSessionStatus() {
   }
 }
 
-saveApiConfigBtn.addEventListener('click', async () => {
-  const saved = window.AorBConfig.setApiBaseUrl(apiBaseInputEl.value);
-  apiBaseInputEl.value = saved;
-  await loadSession();
-});
-
 choiceAEl.addEventListener('click', () => sendVote('A'));
 choiceBEl.addEventListener('click', () => sendVote('B'));
 
-apiBaseInputEl.value = window.AorBConfig.getApiBaseUrl();
 loadSession();
 setInterval(pollSessionStatus, 5000);
