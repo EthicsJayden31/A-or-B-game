@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>A-or-B 테스트 페이지</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="container stack">
+    <h1>실전 테스트 페이지</h1>
+    <p class="small">정적 페이지에서 Google Sheets(Apps Script) 연동을 바로 검증할 수 있습니다.</p>
+
+    <section class="card stack">
+      <h2>0) Google Apps Script 연결</h2>
+      <label for="apiBaseUrl">Web App URL</label>
+      <input id="apiBaseUrl" placeholder="https://script.google.com/macros/s/.../exec" />
+      <button id="saveApiConfig">URL 저장</button>
+    </section>
+
+    <section class="card stack">
+      <h2>1) 테스트 게임 생성</h2>
+      <form id="testGameForm" class="grid grid-2">
+        <div>
+          <label for="title">제목</label>
+          <input id="title" name="title" required value="오늘 점심은 밥 vs 면" />
+        </div>
+        <div>
+          <label for="optionA">선택지 A</label>
+          <input id="optionA" name="optionA" required value="밥" />
+        </div>
+        <div>
+          <label for="optionB">선택지 B</label>
+          <input id="optionB" name="optionB" required value="면" />
+        </div>
+        <div style="display:flex; align-items:end;">
+          <button type="submit" class="primary">게임 생성 + 세션 시작</button>
+        </div>
+      </form>
+      <p id="currentSession" class="small">아직 생성된 세션이 없습니다.</p>
+      <div class="grid grid-2">
+        <a id="hostLink" class="session-link" href="./client.html" target="_blank" rel="noreferrer">CLIENT 페이지 열기</a>
+        <a id="participantLink" class="session-link" href="#">참여 링크가 준비되면 표시됩니다</a>
+        <a id="hostSessionLink" class="session-link" href="#">HOST 세션 진행 링크가 준비되면 표시됩니다</a>
+      </div>
+    </section>
+
+    <section class="card stack">
+      <h2>2) 참여자 투표 시뮬레이션</h2>
+      <div class="grid grid-2">
+        <div>
+          <label for="countA">A(선택지 A) 투표 수</label>
+          <input id="countA" type="number" min="0" value="10" />
+        </div>
+        <div>
+          <label for="countB">B(선택지 B) 투표 수</label>
+          <input id="countB" type="number" min="0" value="12" />
+        </div>
+      </div>
+      <button id="simulateVotes">가상 참여자 투표 실행</button>
+      <p class="small">동일 세션 내에서는 참여자 토큰 중복 투표가 자동으로 방지됩니다.</p>
+    </section>
+
+    <section class="card stack">
+      <h2>3) 세션 종료 및 결과 확인</h2>
+      <button id="closeSession" class="danger">세션 종료</button>
+      <div class="kpi">
+        <div class="a" id="resultA">A: -</div>
+        <div class="b" id="resultB">B: -</div>
+      </div>
+      <p id="resultSummary" class="small">결과가 아직 없습니다.</p>
+    </section>
+
+    <section class="card stack">
+      <h2>실시간 로그</h2>
+      <pre id="logs" class="log-box"></pre>
+    </section>
+  </div>
+
+  <script src="./config.js"></script>
+  <script src="./api.js"></script>
+  <script src="./test.js"></script>
+</body>
+</html>

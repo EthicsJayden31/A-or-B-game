@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>A-or-B HOST (세션 진행)</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="mobile stack">
+    <section class="card stack">
+      <h1>HOST 세션 진행 페이지</h1>
+      <p class="small">세션 ID를 기반으로 수업 진행을 제어합니다. 세션 종료 전에는 결과를 볼 수 없습니다.</p>
+      <a class="session-link" href="./client.html" target="_blank" rel="noreferrer">CLIENT 관리 페이지 열기</a>
+    </section>
+
+    <section class="card stack">
+      <h2>Google Apps Script 연결</h2>
+      <label for="apiBaseUrl">Web App URL</label>
+      <input id="apiBaseUrl" placeholder="https://script.google.com/macros/s/.../exec" />
+      <button id="saveApiConfig">URL 저장</button>
+    </section>
+
+    <section class="card stack">
+      <label for="sessionIdInput">세션 ID</label>
+      <input id="sessionIdInput" placeholder="예: abc123xy" />
+      <button id="loadSession">세션 불러오기</button>
+      <p id="status" class="small">세션을 입력하고 불러오세요.</p>
+    </section>
+
+    <section class="card stack" id="sessionPanel">
+      <h2 id="gameTitle">세션 미선택</h2>
+      <p class="small" id="gameOptions"></p>
+      <p class="small" id="sessionState">진행 상태: -</p>
+
+      <div id="resultPanel" class="stack hidden">
+        <h3>최종 결과</h3>
+        <div class="kpi">
+          <div class="a" id="resultA">A: -</div>
+          <div class="b" id="resultB">B: -</div>
+        </div>
+        <p class="small" id="resultSummary">-</p>
+      </div>
+
+      <button id="closeSession" class="danger">세션 종료 및 결과 공개</button>
+    </section>
+
+    <section class="card stack">
+      <h2>실시간 로그</h2>
+      <pre id="logs" class="log-box"></pre>
+    </section>
+  </div>
+
+  <script src="./config.js"></script>
+  <script src="./api.js"></script>
+  <script src="./host.js"></script>
+</body>
+</html>
