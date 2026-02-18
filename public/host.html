@@ -4,13 +4,21 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>A-or-B HOST</title>
-  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
   <div class="container stack">
     <h1>A or B 게임 설계 및 운영</h1>
-    <p class="small">수업에서 즉시 사용 가능한 세션을 만들고 QR코드로 배포하세요.</p>
-    <a class="session-link" href="/test.html" target="_blank" rel="noreferrer">테스트 페이지 열기</a>
+    <p class="small">정적 배포 + Google Sheets(Apps Script) 방식으로 운영합니다.</p>
+    <a class="session-link" href="./test.html" target="_blank" rel="noreferrer">테스트 페이지 열기</a>
+
+    <section class="card stack">
+      <h2>Google Apps Script 연결</h2>
+      <label for="apiBaseUrl">Web App URL</label>
+      <input id="apiBaseUrl" placeholder="https://script.google.com/macros/s/.../exec" />
+      <button id="saveApiConfig">URL 저장</button>
+      <p class="small">한 번 저장하면 브라우저 localStorage에 보관됩니다.</p>
+    </section>
 
     <section class="card stack">
       <h2>새 게임 설계</h2>
@@ -37,7 +45,9 @@
     <section class="stack" id="games"></section>
   </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
-  <script src="/host.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script src="./config.js"></script>
+  <script src="./api.js"></script>
+  <script src="./host.js"></script>
 </body>
 </html>

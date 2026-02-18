@@ -1,47 +1,38 @@
 const gamesEl = document.getElementById('games');
 const form = document.getElementById('createGameForm');
 const statusEl = document.getElementById('status');
+const apiBaseInputEl = document.getElementById('apiBaseUrl');
+const saveApiConfigBtn = document.getElementById('saveApiConfig');
 
 function formatDate(value) {
   return new Date(value).toLocaleString('ko-KR');
 }
 
+function participantJoinUrl(sessionId) {
+  const url = new URL('participant.html', window.location.href);
+  url.searchParams.set('session', sessionId);
+  return url.toString();
+}
+
 async function fetchGames() {
-  const response = await fetch('/api/games');
-  const data = await response.json();
+  const data = await window.AorBApi.listGames();
   return data.games || [];
 }
 
 async function createGame(payload) {
-  const response = await fetch('/api/games', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) {
-    const err = await response.json();
-    throw new Error(err.error || '게임 생성에 실패했습니다.');
-  }
+  await window.AorBApi.createGame(payload.title, payload.optionA, payload.optionB);
 }
 
 async function startSession(gameId) {
-  const response = await fetch(`/api/games/${gameId}/sessions`, { method: 'POST' });
-  if (!response.ok) {
-    const err = await response.json();
-    throw new Error(err.error || '세션 시작에 실패했습니다.');
-  }
+  await window.AorBApi.startSession(gameId);
 }
 
 async function closeSession(sessionId) {
-  const response = await fetch(`/api/sessions/${sessionId}/close`, { method: 'POST' });
-  if (!response.ok) {
-    const err = await response.json();
-    throw new Error(err.error || '세션 종료에 실패했습니다.');
-  }
+  await window.AorBApi.closeSession(sessionId);
 }
 
 function sessionTemplate(session) {
-  const sessionUrl = `${window.location.origin}/join/${session.id}`;
+  const sessionUrl = participantJoinUrl(session.id);
   const statusClass = session.status === 'active' ? 'active' : 'closed';
   const statusText = session.status === 'active' ? '진행 중' : '종료됨';
   const closeButton = session.status === 'active'
@@ -98,23 +89,26 @@ function renderGames(games) {
     game.sessions.forEach((session) => {
       const canvas = document.getElementById(`qr-${session.id}`);
       if (!canvas || !window.QRCode) return;
-      const joinUrl = `${window.location.origin}/join/${session.id}`;
-      window.QRCode.toCanvas(canvas, joinUrl, { width: 150, margin: 1 }, () => {});
+      window.QRCode.toCanvas(canvas, participantJoinUrl(session.id), { width: 150, margin: 1 }, () => {});
     });
   });
 }
 
 async function refreshGames() {
-  const games = await fetchGames();
-  renderGames(games);
+  try {
+    const games = await fetchGames();
+    renderGames(games);
+  } catch (error) {
+    statusEl.textContent = error.message;
+  }
 }
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
   const formData = new FormData(form);
-  const title = formData.get('title').trim();
-  const optionA = formData.get('optionA').trim();
-  const optionB = formData.get('optionB').trim();
+  const title = String(formData.get('title')).trim();
+  const optionA = String(formData.get('optionA')).trim();
+  const optionB = String(formData.get('optionB')).trim();
 
   try {
     await createGame({ title, optionA, optionB });
@@ -140,10 +134,13 @@ gamesEl.addEventListener('click', async (event) => {
   }
 });
 
-const source = new EventSource('/events/host');
-source.addEventListener('gamesUpdated', (event) => {
-  const data = JSON.parse(event.data);
-  renderGames(data.games || []);
+saveApiConfigBtn.addEventListener('click', async () => {
+  const saved = window.AorBConfig.setApiBaseUrl(apiBaseInputEl.value);
+  apiBaseInputEl.value = saved;
+  statusEl.textContent = 'Google Apps Script URL이 저장되었습니다.';
+  await refreshGames();
 });
 
+apiBaseInputEl.value = window.AorBConfig.getApiBaseUrl();
 refreshGames();
+setInterval(refreshGames, 5000);

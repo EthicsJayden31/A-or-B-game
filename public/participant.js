@@ -1,5 +1,5 @@
-const parts = window.location.pathname.split('/');
-const sessionId = parts[parts.length - 1];
+const params = new URLSearchParams(window.location.search);
+const sessionId = params.get('session');
 
 const titleEl = document.getElementById('title');
 const optionsEl = document.getElementById('options');
@@ -7,9 +7,11 @@ const messageEl = document.getElementById('message');
 const choiceAreaEl = document.getElementById('choiceArea');
 const choiceAEl = document.getElementById('choiceA');
 const choiceBEl = document.getElementById('choiceB');
+const apiBaseInputEl = document.getElementById('apiBaseUrl');
+const saveApiConfigBtn = document.getElementById('saveApiConfig');
 
 let localSession;
-const participantTokenKey = `aorb-${sessionId}`;
+const participantTokenKey = `aorb-${sessionId || 'unknown'}`;
 const existing = localStorage.getItem(participantTokenKey);
 const participantToken = existing || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 if (!existing) localStorage.setItem(participantTokenKey, participantToken);
@@ -31,56 +33,68 @@ function showClosedResult(payload) {
 }
 
 async function loadSession() {
-  const response = await fetch(`/api/sessions/${sessionId}`);
-  if (!response.ok) {
-    titleEl.textContent = '세션을 찾을 수 없습니다.';
-    setMessage('링크를 다시 확인해 주세요.');
+  if (!sessionId) {
+    titleEl.textContent = '세션 정보가 없습니다.';
+    setMessage('참여 링크를 다시 확인해 주세요. (participant.html?session=세션ID)');
+    showChoices(false);
     return;
   }
 
-  const data = await response.json();
-  localSession = data;
+  try {
+    const data = await window.AorBApi.getSession(sessionId);
+    localSession = data;
 
-  titleEl.textContent = data.game.title;
-  optionsEl.textContent = `A: ${data.game.optionA} / B: ${data.game.optionB}`;
-  choiceAEl.textContent = `A 선택 · ${data.game.optionA}`;
-  choiceBEl.textContent = `B 선택 · ${data.game.optionB}`;
+    titleEl.textContent = data.game.title;
+    optionsEl.textContent = `A: ${data.game.optionA} / B: ${data.game.optionB}`;
+    choiceAEl.textContent = `A 선택 · ${data.game.optionA}`;
+    choiceBEl.textContent = `B 선택 · ${data.game.optionB}`;
 
-  if (data.session.status === 'closed') {
-    showClosedResult({ ...data.session, optionA: data.game.optionA, optionB: data.game.optionB });
-    return;
+    if (data.session.status === 'closed') {
+      showClosedResult({ ...data.session, optionA: data.game.optionA, optionB: data.game.optionB });
+      return;
+    }
+
+    setMessage('하나를 선택하고 HOST가 세션을 종료할 때까지 기다려 주세요.');
+    showChoices(true);
+  } catch (error) {
+    titleEl.textContent = '세션을 불러오지 못했습니다.';
+    setMessage(error.message);
   }
-
-  setMessage('하나를 선택하고 HOST가 세션을 종료할 때까지 기다려 주세요.');
-  showChoices(true);
 }
 
 async function sendVote(choice) {
   if (!localSession || localSession.session.status !== 'active') return;
 
-  const response = await fetch(`/api/sessions/${sessionId}/vote`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ choice, token: participantToken }),
-  });
-
-  const data = await response.json();
-  if (!response.ok) {
-    setMessage(data.error || '선택 저장에 실패했습니다.');
-    return;
+  try {
+    await window.AorBApi.vote(sessionId, choice, participantToken);
+    showChoices(false);
+    setMessage('선택이 저장되었습니다. HOST가 결과를 공개할 때까지 대기해 주세요.');
+  } catch (error) {
+    setMessage(error.message);
   }
-
-  showChoices(false);
-  setMessage('선택이 저장되었습니다. HOST가 결과를 공개할 때까지 대기해 주세요.');
 }
+
+async function pollSessionStatus() {
+  try {
+    if (!sessionId) return;
+    const data = await window.AorBApi.getSession(sessionId);
+    if (data.session.status === 'closed') {
+      showClosedResult({ ...data.session, optionA: data.game.optionA, optionB: data.game.optionB });
+    }
+  } catch (_error) {
+    // polling 에러는 무시하고 다음 주기에 재시도
+  }
+}
+
+saveApiConfigBtn.addEventListener('click', async () => {
+  const saved = window.AorBConfig.setApiBaseUrl(apiBaseInputEl.value);
+  apiBaseInputEl.value = saved;
+  await loadSession();
+});
 
 choiceAEl.addEventListener('click', () => sendVote('A'));
 choiceBEl.addEventListener('click', () => sendVote('B'));
 
-const source = new EventSource(`/events/session/${sessionId}`);
-source.addEventListener('sessionClosed', (event) => {
-  const payload = JSON.parse(event.data);
-  showClosedResult(payload);
-});
-
+apiBaseInputEl.value = window.AorBConfig.getApiBaseUrl();
 loadSession();
+setInterval(pollSessionStatus, 5000);

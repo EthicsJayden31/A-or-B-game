@@ -4,12 +4,19 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>A-or-B 테스트 페이지</title>
-  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
   <div class="container stack">
     <h1>실전 테스트 페이지</h1>
-    <p class="small">게임 생성부터 가상 참여자 투표, 결과 공개까지 한 번에 테스트할 수 있습니다.</p>
+    <p class="small">정적 페이지에서 Google Sheets(Apps Script) 연동을 바로 검증할 수 있습니다.</p>
+
+    <section class="card stack">
+      <h2>0) Google Apps Script 연결</h2>
+      <label for="apiBaseUrl">Web App URL</label>
+      <input id="apiBaseUrl" placeholder="https://script.google.com/macros/s/.../exec" />
+      <button id="saveApiConfig">URL 저장</button>
+    </section>
 
     <section class="card stack">
       <h2>1) 테스트 게임 생성</h2>
@@ -32,7 +39,7 @@
       </form>
       <p id="currentSession" class="small">아직 생성된 세션이 없습니다.</p>
       <div class="grid grid-2">
-        <a id="hostLink" class="session-link" href="/host.html" target="_blank" rel="noreferrer">HOST 페이지 열기</a>
+        <a id="hostLink" class="session-link" href="./host.html" target="_blank" rel="noreferrer">HOST 페이지 열기</a>
         <a id="participantLink" class="session-link" href="#">참여 링크가 준비되면 표시됩니다</a>
       </div>
     </section>
@@ -69,6 +76,8 @@
     </section>
   </div>
 
-  <script src="/test.js"></script>
+  <script src="./config.js"></script>
+  <script src="./api.js"></script>
+  <script src="./test.js"></script>
 </body>
 </html>
