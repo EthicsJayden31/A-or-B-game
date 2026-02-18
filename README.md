@@ -1,4 +1,4 @@
-# 🧑‍🏫A-or-B Game (서버 없이 운영: Google Sheets + Apps Script)
+# A-or-B Game (서버 없이 운영: Google Sheets + Apps Script)
 
 이 프로젝트는 **수업 시간에 학생들이 실시간으로 A/B 중 하나를 고르는 게임**을 운영하기 위한 도구입니다.
 

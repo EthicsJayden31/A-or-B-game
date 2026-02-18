@@ -3,6 +3,12 @@ const form = document.getElementById('createGameForm');
 const statusEl = document.getElementById('status');
 const apiBaseInputEl = document.getElementById('apiBaseUrl');
 const saveApiConfigBtn = document.getElementById('saveApiConfig');
+const logsEl = document.getElementById('logs');
+
+function log(message) {
+  const now = new Date().toLocaleTimeString('ko-KR');
+  logsEl.textContent = `[${now}] ${message}\n${logsEl.textContent}`.slice(0, 10000);
+}
 
 function formatDate(value) {
   return new Date(value).toLocaleString('ko-KR');
@@ -100,6 +106,7 @@ async function refreshGames() {
     renderGames(games);
   } catch (error) {
     statusEl.textContent = error.message;
+    log(`오류: ${error.message}`);
   }
 }
 
@@ -114,9 +121,11 @@ form.addEventListener('submit', async (event) => {
     await createGame({ title, optionA, optionB });
     form.reset();
     statusEl.textContent = '게임이 저장되었습니다.';
+    log(`게임 저장 완료: ${title}`);
     await refreshGames();
   } catch (error) {
     statusEl.textContent = error.message;
+    log(`게임 저장 실패: ${error.message}`);
   }
 });
 
@@ -126,11 +135,18 @@ gamesEl.addEventListener('click', async (event) => {
 
   const { action } = button.dataset;
   try {
-    if (action === 'start-session') await startSession(button.dataset.gameId);
-    if (action === 'close-session') await closeSession(button.dataset.sessionId);
+    if (action === 'start-session') {
+      await startSession(button.dataset.gameId);
+      log(`세션 시작 완료 (gameId: ${button.dataset.gameId})`);
+    }
+    if (action === 'close-session') {
+      await closeSession(button.dataset.sessionId);
+      log(`세션 종료 완료 (sessionId: ${button.dataset.sessionId})`);
+    }
     await refreshGames();
   } catch (error) {
     statusEl.textContent = error.message;
+    log(`요청 실패: ${error.message}`);
   }
 });
 
@@ -138,9 +154,11 @@ saveApiConfigBtn.addEventListener('click', async () => {
   const saved = window.AorBConfig.setApiBaseUrl(apiBaseInputEl.value);
   apiBaseInputEl.value = saved;
   statusEl.textContent = 'Google Apps Script URL이 저장되었습니다.';
+  log('Google Apps Script URL 저장 완료');
   await refreshGames();
 });
 
 apiBaseInputEl.value = window.AorBConfig.getApiBaseUrl();
+log('HOST 페이지 준비 완료');
 refreshGames();
 setInterval(refreshGames, 5000);
