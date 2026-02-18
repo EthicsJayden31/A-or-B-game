@@ -21,3 +21,8 @@ node server.js
 ## 데이터 저장
 - `data/games.json`에 게임/세션 이력이 저장됩니다.
 - 각 세션은 `participantTokens`와 `votes`를 독립 관리해 회차 간 영향이 없습니다.
+
+
+## TEST 페이지
+- 빠른 검증용 페이지: `http://localhost:3000/test.html`
+- 테스트 게임 생성 → 가상 참여자 투표(A/B 수량 지정) → 세션 종료까지 한 화면에서 실행할 수 있습니다.
