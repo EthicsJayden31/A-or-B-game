@@ -1,0 +1,9 @@
+{
+  "name": "a-or-b-game",
+  "version": "1.0.0",
+  "description": "Real-time A-or-B classroom game",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
