@@ -8,8 +8,6 @@ const resultAEl = document.getElementById('resultA');
 const resultBEl = document.getElementById('resultB');
 const resultSummaryEl = document.getElementById('resultSummary');
 const logsEl = document.getElementById('logs');
-const apiBaseInputEl = document.getElementById('apiBaseUrl');
-const saveApiConfigBtn = document.getElementById('saveApiConfig');
 
 let currentGame;
 let currentSession;
@@ -19,17 +17,15 @@ function log(message) {
   logsEl.textContent = `[${now}] ${message}\n${logsEl.textContent}`.slice(0, 10000);
 }
 
-function participantJoinUrl(sessionId) {
+function participantJoinUrl() {
   const url = new URL('participant.html', window.location.href);
-  url.searchParams.set('session', sessionId);
   const api = window.AorBConfig.getApiBaseUrl();
   if (api) url.searchParams.set('api', api);
   return url.toString();
 }
 
-function hostRunUrl(sessionId) {
+function hostRunUrl() {
   const url = new URL('host.html', window.location.href);
-  url.searchParams.set('session', sessionId);
   const api = window.AorBConfig.getApiBaseUrl();
   if (api) url.searchParams.set('api', api);
   return url.toString();
@@ -42,13 +38,13 @@ async function pollCurrentSession() {
     const data = await window.AorBApi.getSession(currentSession.id);
 
     if (data.session.status === 'closed') {
-      resultAEl.textContent = `A: ${data.session.votes.A}`;
-      resultBEl.textContent = `B: ${data.session.votes.B}`;
+      resultAEl.textContent = `${data.game.optionA}: ${data.session.votes.A}`;
+      resultBEl.textContent = `${data.game.optionB}: ${data.session.votes.B}`;
       resultSummaryEl.textContent = `세션 종료 · 총 ${data.session.totalVotes}명 참여`;
     } else {
-      resultAEl.textContent = 'A: 비공개';
-      resultBEl.textContent = 'B: 비공개';
-      resultSummaryEl.textContent = '진행 중에는 결과가 비공개입니다.';
+      resultAEl.textContent = '선택지 A: 비공개';
+      resultBEl.textContent = '선택지 B: 비공개';
+      resultSummaryEl.textContent = `진행 중 · 참여자 ${data.session.participantCount ?? 0}명`;
     }
   } catch (_error) {
     // 무시
@@ -77,8 +73,8 @@ testForm.addEventListener('submit', async (event) => {
     const sessionData = await window.AorBApi.startSession(currentGame.id);
     currentSession = sessionData.session;
 
-    const joinUrl = participantJoinUrl(currentSession.id);
-    const hostUrl = hostRunUrl(currentSession.id);
+    const joinUrl = participantJoinUrl();
+    const hostUrl = hostRunUrl();
     currentSessionEl.textContent = `세션 생성 완료 · Game ID ${currentGame.id} / Session ID ${currentSession.id}`;
     participantLinkEl.href = joinUrl;
     participantLinkEl.target = '_blank';
@@ -90,8 +86,8 @@ testForm.addEventListener('submit', async (event) => {
     hostSessionLinkEl.rel = 'noreferrer';
     hostSessionLinkEl.textContent = `HOST 세션 진행 링크 열기: ${hostUrl}`;
 
-    resultAEl.textContent = 'A: 비공개';
-    resultBEl.textContent = 'B: 비공개';
+    resultAEl.textContent = '선택지 A: 비공개';
+    resultBEl.textContent = '선택지 B: 비공개';
     resultSummaryEl.textContent = '세션이 시작되었습니다. 진행 중에는 결과가 비공개입니다.';
     log(`테스트 세션 생성 완료 (${currentSession.id})`);
   } catch (error) {
@@ -134,21 +130,14 @@ closeSessionBtn.addEventListener('click', async () => {
   try {
     ensureSession();
     const data = await window.AorBApi.closeSession(currentSession.id);
-    resultAEl.textContent = `A: ${data.votes.A}`;
-    resultBEl.textContent = `B: ${data.votes.B}`;
+    resultAEl.textContent = `${data.optionA}: ${data.votes.A}`;
+    resultBEl.textContent = `${data.optionB}: ${data.votes.B}`;
     resultSummaryEl.textContent = `세션 종료 · 총 ${data.totalVotes}명 참여`;
-    log(`세션 종료 완료 - 최종 A ${data.votes.A}, B ${data.votes.B}`);
+    log(`세션 종료 완료 - 최종 ${data.optionA} ${data.votes.A}, ${data.optionB} ${data.votes.B}`);
   } catch (error) {
     log(`오류: ${error.message}`);
   }
 });
 
-saveApiConfigBtn.addEventListener('click', () => {
-  const saved = window.AorBConfig.setApiBaseUrl(apiBaseInputEl.value);
-  apiBaseInputEl.value = saved;
-  log('Google Apps Script URL이 저장되었습니다.');
-});
-
-apiBaseInputEl.value = window.AorBConfig.getApiBaseUrl();
-log('테스트 페이지 준비 완료. 먼저 Google Apps Script URL을 설정해 주세요.');
+log('테스트 페이지 준비 완료. Apps Script URL은 CLIENT 페이지에서 저장해 주세요.');
 setInterval(pollCurrentSession, 5000);

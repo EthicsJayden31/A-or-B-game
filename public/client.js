@@ -14,17 +14,15 @@ function formatDate(value) {
   return new Date(value).toLocaleString('ko-KR');
 }
 
-function participantJoinUrl(sessionId) {
+function participantJoinUrl() {
   const url = new URL('participant.html', window.location.href);
-  url.searchParams.set('session', sessionId);
   const api = window.AorBConfig.getApiBaseUrl();
   if (api) url.searchParams.set('api', api);
   return url.toString();
 }
 
-function hostRunUrl(sessionId) {
+function hostRunUrl() {
   const url = new URL('host.html', window.location.href);
-  url.searchParams.set('session', sessionId);
   const api = window.AorBConfig.getApiBaseUrl();
   if (api) url.searchParams.set('api', api);
   return url.toString();
@@ -36,14 +34,11 @@ async function fetchGames() {
 }
 
 function sessionTemplate(session) {
-  const sessionUrl = participantJoinUrl(session.id);
-  const runUrl = hostRunUrl(session.id);
   const statusClass = session.status === 'active' ? 'active' : 'closed';
   const statusText = session.status === 'active' ? '진행 중' : '종료됨';
-
   const resultBlock = session.status === 'closed'
-    ? `<div class="kpi"><div class="a">A: ${session.votes.A}</div><div class="b">B: ${session.votes.B}</div></div><p class="small">총 응답: ${session.totalVotes}명</p>`
-    : '<p class="small">진행 중인 세션 결과는 HOST 종료 전까지 비공개입니다.</p>';
+    ? `<div class="kpi"><div class="a">${session.optionA}: ${session.votes.A}</div><div class="b">${session.optionB}: ${session.votes.B}</div></div><p class="small">총 응답: ${session.totalVotes}명</p>`
+    : `<p class="small">참여자 수: ${session.participantCount ?? 0}명 · 결과 비공개</p>`;
 
   return `
     <div class="card stack">
@@ -53,18 +48,20 @@ function sessionTemplate(session) {
       </div>
       <p class="small">시작: ${formatDate(session.createdAt)}</p>
       ${resultBlock}
-      <a class="session-link" href="${sessionUrl}" target="_blank" rel="noreferrer">참여 링크: ${sessionUrl}</a>
-      <a class="session-link" href="${runUrl}" target="_blank" rel="noreferrer">HOST 진행 링크: ${runUrl}</a>
-      <canvas id="qr-${session.id}" width="150" height="150"></canvas>
       <button data-action="delete-session" data-session-id="${session.id}" class="danger">이 세션 삭제</button>
     </div>
   `;
 }
 
-function gameTemplate(game) {
+function gameTemplate(game, hasActiveSession) {
   const sessionList = game.sessions.length
     ? game.sessions.map((session) => sessionTemplate(session)).join('')
     : '<p class="small">아직 세션이 없습니다. 새 세션을 시작하세요.</p>';
+
+  const startDisabled = hasActiveSession ? 'disabled' : '';
+  const startHelp = hasActiveSession
+    ? '<p class="small">현재 다른 진행 중 세션이 있어 새 세션을 시작할 수 없습니다.</p>'
+    : '';
 
   return `
     <article class="card stack">
@@ -75,10 +72,11 @@ function gameTemplate(game) {
           <p class="small">생성: ${formatDate(game.createdAt)}</p>
         </div>
         <div class="stack" style="gap:0.4rem; width: 220px;">
-          <button data-action="start-session" data-game-id="${game.id}">새 세션 시작</button>
+          <button data-action="start-session" data-game-id="${game.id}" ${startDisabled}>새 세션 시작</button>
           <button data-action="delete-game" data-game-id="${game.id}" class="danger">게임 전체 삭제</button>
         </div>
       </div>
+      ${startHelp}
       <div class="grid grid-2">${sessionList}</div>
     </article>
   `;
@@ -90,15 +88,17 @@ function renderGames(games) {
     return;
   }
 
-  gamesEl.innerHTML = games.map(gameTemplate).join('');
+  const hasActiveSession = games.some((game) => game.sessions.some((s) => s.status === 'active'));
 
-  games.forEach((game) => {
-    game.sessions.forEach((session) => {
-      const canvas = document.getElementById(`qr-${session.id}`);
-      if (!canvas || !window.QRCode) return;
-      window.QRCode.toCanvas(canvas, participantJoinUrl(session.id), { width: 150, margin: 1 }, () => {});
-    });
-  });
+  gamesEl.innerHTML = games.map((game) => gameTemplate(game, hasActiveSession)).join('');
+
+  const activeBanner = hasActiveSession
+    ? `<section class="card"><p class="small">현재 진행 중 세션이 있습니다. HOST: <a class="session-link" href="${hostRunUrl()}" target="_blank">${hostRunUrl()}</a> / PARTICIPANT: <a class="session-link" href="${participantJoinUrl()}" target="_blank">${participantJoinUrl()}</a></p></section>`
+    : '';
+
+  if (activeBanner) {
+    gamesEl.insertAdjacentHTML('afterbegin', activeBanner);
+  }
 }
 
 async function refreshGames() {

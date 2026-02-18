@@ -1,5 +1,4 @@
 const params = new URLSearchParams(window.location.search);
-const sessionId = params.get('session');
 const queryApi = params.get('api');
 if (queryApi) {
   window.AorBConfig.setApiBaseUrl(queryApi);
@@ -12,11 +11,8 @@ const choiceAreaEl = document.getElementById('choiceArea');
 const choiceAEl = document.getElementById('choiceA');
 const choiceBEl = document.getElementById('choiceB');
 
+let currentSessionId = '';
 let localSession;
-const participantTokenKey = `aorb-${sessionId || 'unknown'}`;
-const existing = localStorage.getItem(participantTokenKey);
-const participantToken = existing || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-if (!existing) localStorage.setItem(participantTokenKey, participantToken);
 
 function setMessage(text) {
   messageEl.innerText = text;
@@ -30,20 +26,42 @@ function showClosedResult(payload) {
   const total = payload.totalVotes || 0;
   const aPercent = total ? Math.round((payload.votes.A / total) * 100) : 0;
   const bPercent = total ? Math.round((payload.votes.B / total) * 100) : 0;
-  setMessage(`세션이 종료되었습니다. 결과 공개!\nA(${payload.optionA}): ${payload.votes.A}명 (${aPercent}%)\nB(${payload.optionB}): ${payload.votes.B}명 (${bPercent}%)`);
+  setMessage(`세션이 종료되었습니다. 결과 공개!\n${payload.optionA}: ${payload.votes.A}명 (${aPercent}%)\n${payload.optionB}: ${payload.votes.B}명 (${bPercent}%)`);
   showChoices(false);
 }
 
-async function loadSession() {
-  if (!sessionId) {
-    titleEl.textContent = '세션 정보가 없습니다.';
-    setMessage('참여 링크를 다시 확인해 주세요. (participant.html?session=세션ID)');
-    showChoices(false);
-    return;
-  }
+function getParticipantToken(sessionId) {
+  const key = `aorb-${sessionId}`;
+  const existing = localStorage.getItem(key);
+  const token = existing || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  if (!existing) localStorage.setItem(key, token);
+  return token;
+}
 
+function findActiveSessionFromGames(games) {
+  for (const game of games) {
+    const active = (game.sessions || []).find((session) => session.status === 'active');
+    if (active) return active.id;
+  }
+  return '';
+}
+
+async function loadSession() {
   try {
-    const data = await window.AorBApi.getSession(sessionId);
+    const gamesData = await window.AorBApi.listGames();
+    const activeSessionId = findActiveSessionFromGames(gamesData.games || []);
+
+    if (!activeSessionId) {
+      currentSessionId = '';
+      titleEl.textContent = '진행 중 세션이 없습니다.';
+      optionsEl.textContent = '';
+      setMessage('HOST가 세션을 시작하면 자동으로 참여 화면이 열립니다.');
+      showChoices(false);
+      return;
+    }
+
+    const data = await window.AorBApi.getSession(activeSessionId);
+    currentSessionId = activeSessionId;
     localSession = data;
 
     titleEl.textContent = data.game.title;
@@ -61,14 +79,16 @@ async function loadSession() {
   } catch (error) {
     titleEl.textContent = '세션을 불러오지 못했습니다.';
     setMessage(error.message);
+    showChoices(false);
   }
 }
 
 async function sendVote(choice) {
-  if (!localSession || localSession.session.status !== 'active') return;
+  if (!currentSessionId || !localSession || localSession.session.status !== 'active') return;
 
   try {
-    await window.AorBApi.vote(sessionId, choice, participantToken);
+    const token = getParticipantToken(currentSessionId);
+    await window.AorBApi.vote(currentSessionId, choice, token);
     showChoices(false);
     setMessage('선택이 저장되었습니다. HOST가 결과를 공개할 때까지 대기해 주세요.');
   } catch (error) {
@@ -76,20 +96,8 @@ async function sendVote(choice) {
   }
 }
 
-async function pollSessionStatus() {
-  try {
-    if (!sessionId) return;
-    const data = await window.AorBApi.getSession(sessionId);
-    if (data.session.status === 'closed') {
-      showClosedResult({ ...data.session, optionA: data.game.optionA, optionB: data.game.optionB });
-    }
-  } catch (_error) {
-    // polling 에러는 무시하고 다음 주기에 재시도
-  }
-}
-
 choiceAEl.addEventListener('click', () => sendVote('A'));
 choiceBEl.addEventListener('click', () => sendVote('B'));
 
 loadSession();
-setInterval(pollSessionStatus, 5000);
+setInterval(loadSession, 5000);

@@ -1,10 +1,5 @@
 /**
  * Google Apps Script backend for A-or-B Game.
- *
- * Required sheets in one Spreadsheet:
- * - games:    [id, title, optionA, optionB, createdAt]
- * - sessions: [id, gameId, status, createdAt, closedAt, votesA, votesB]
- * - votes:    [sessionId, participantToken, choice, createdAt]
  */
 
 const SHEET_GAMES = 'games';
@@ -26,27 +21,15 @@ function route(body) {
   if (!action) throw new Error('action이 필요합니다.');
 
   switch (action) {
-    case 'listGames':
-      return { ok: true, games: listGames() };
-    case 'createGame':
-      return { ok: true, game: createGame(body) };
-    case 'deleteGame':
-      deleteGame(body);
-      return { ok: true };
-    case 'startSession':
-      return { ok: true, session: startSession(body) };
-    case 'deleteSession':
-      deleteSession(body);
-      return { ok: true };
-    case 'closeSession':
-      return { ok: true, ...closeSession(body) };
-    case 'getSession':
-      return { ok: true, ...getSession(body) };
-    case 'vote':
-      vote(body);
-      return { ok: true };
-    default:
-      throw new Error('지원하지 않는 action입니다.');
+    case 'listGames': return { ok: true, games: listGames() };
+    case 'createGame': return { ok: true, game: createGame(body) };
+    case 'deleteGame': deleteGame(body); return { ok: true };
+    case 'startSession': return { ok: true, session: startSession(body) };
+    case 'deleteSession': deleteSession(body); return { ok: true };
+    case 'closeSession': return { ok: true, ...closeSession(body) };
+    case 'getSession': return { ok: true, ...getSession(body) };
+    case 'vote': vote(body); return { ok: true };
+    default: throw new Error('지원하지 않는 action입니다.');
   }
 }
 
@@ -66,9 +49,7 @@ function getSheets_() {
 function uid_(len) {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
   let id = '';
-  for (let i = 0; i < len; i += 1) {
-    id += chars[Math.floor(Math.random() * chars.length)];
-  }
+  for (let i = 0; i < len; i += 1) id += chars[Math.floor(Math.random() * chars.length)];
   return id;
 }
 
@@ -81,13 +62,19 @@ function listGames() {
   sessionRows.forEach((s) => {
     if (!byGame[s.gameId]) byGame[s.gameId] = [];
     const isClosed = s.status === 'closed';
+    const votesA = Number(s.votesA || 0);
+    const votesB = Number(s.votesB || 0);
+
     byGame[s.gameId].push({
       id: s.id,
       status: s.status,
       createdAt: s.createdAt,
       closedAt: s.closedAt || null,
-      votes: isClosed ? { A: Number(s.votesA || 0), B: Number(s.votesB || 0) } : { A: null, B: null },
-      totalVotes: isClosed ? Number(s.votesA || 0) + Number(s.votesB || 0) : null,
+      optionA: '',
+      optionB: '',
+      votes: isClosed ? { A: votesA, B: votesB } : { A: null, B: null },
+      totalVotes: isClosed ? votesA + votesB : null,
+      participantCount: votesA + votesB,
       resultVisible: isClosed,
     });
   });
@@ -98,7 +85,8 @@ function listGames() {
     optionA: g.optionA,
     optionB: g.optionB,
     createdAt: g.createdAt,
-    sessions: (byGame[g.id] || []).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))),
+    sessions: (byGame[g.id] || []).map((s) => ({ ...s, optionA: g.optionA, optionB: g.optionB }))
+      .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))),
   })).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 }
 
@@ -109,13 +97,7 @@ function createGame(body) {
   if (!title || !optionA || !optionB) throw new Error('title, optionA, optionB는 필수입니다.');
 
   const { games } = getSheets_();
-  const game = {
-    id: uid_(10),
-    title,
-    optionA,
-    optionB,
-    createdAt: new Date().toISOString(),
-  };
+  const game = { id: uid_(10), title: title, optionA: optionA, optionB: optionB, createdAt: new Date().toISOString() };
   games.appendRow([game.id, game.title, game.optionA, game.optionB, game.createdAt]);
   return game;
 }
@@ -126,15 +108,9 @@ function deleteGame(body) {
 
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
-
   try {
     const { games, sessions, votes } = getSheets_();
-    const gameRows = readRows_(games);
     const sessionRows = readRows_(sessions);
-
-    const gameIndex = gameRows.findIndex((g) => g.id === gameId);
-    if (gameIndex < 0) throw new Error('게임을 찾지 못했습니다.');
-
     const sessionIds = sessionRows.filter((s) => s.gameId === gameId).map((s) => s.id);
 
     deleteRowsByPredicate_(votes, (r) => sessionIds.indexOf(String(r.sessionId)) >= 0);
@@ -151,29 +127,15 @@ function startSession(body) {
 
   const { sessions } = getSheets_();
   const rows = readRows_(sessions);
-  const active = rows.find((r) => r.gameId === gameId && r.status === 'active');
-  if (active) throw new Error('이미 진행 중인 세션이 있습니다.');
+  const active = rows.find((r) => r.status === 'active');
+  if (active) throw new Error('이미 진행 중인 세션이 있습니다. 한 번에 하나의 세션만 운영할 수 있습니다.');
 
   const session = {
-    id: uid_(8),
-    gameId,
-    status: 'active',
-    createdAt: new Date().toISOString(),
-    closedAt: '',
-    votesA: 0,
-    votesB: 0,
+    id: uid_(8), gameId: gameId, status: 'active', createdAt: new Date().toISOString(), closedAt: '', votesA: 0, votesB: 0,
   };
 
   sessions.appendRow([session.id, session.gameId, session.status, session.createdAt, session.closedAt, session.votesA, session.votesB]);
-  return {
-    id: session.id,
-    status: session.status,
-    createdAt: session.createdAt,
-    closedAt: null,
-    votes: { A: null, B: null },
-    totalVotes: null,
-    resultVisible: false,
-  };
+  return { id: session.id, status: session.status, createdAt: session.createdAt, votes: { A: null, B: null }, participantCount: 0, resultVisible: false };
 }
 
 function deleteSession(body) {
@@ -182,13 +144,8 @@ function deleteSession(body) {
 
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
-
   try {
     const { sessions, votes } = getSheets_();
-    const sessionRows = readRows_(sessions);
-    const exists = sessionRows.find((s) => s.id === sessionId);
-    if (!exists) throw new Error('세션을 찾지 못했습니다.');
-
     deleteRowsByPredicate_(votes, (r) => String(r.sessionId) === sessionId);
     deleteRowsByPredicate_(sessions, (r) => String(r.id) === sessionId);
   } finally {
@@ -214,14 +171,16 @@ function closeSession(body) {
 
   const updated = readRows_(sessions).find((s) => s.id === sessionId);
   const game = gameRows.find((g) => g.id === updated.gameId);
+  const votesA = Number(updated.votesA || 0);
+  const votesB = Number(updated.votesB || 0);
 
   return {
-    sessionId,
+    sessionId: sessionId,
     gameTitle: game.title,
     optionA: game.optionA,
     optionB: game.optionB,
-    votes: { A: Number(updated.votesA || 0), B: Number(updated.votesB || 0) },
-    totalVotes: Number(updated.votesA || 0) + Number(updated.votesB || 0),
+    votes: { A: votesA, B: votesB },
+    totalVotes: votesA + votesB,
   };
 }
 
@@ -232,27 +191,24 @@ function getSession(body) {
   const { games, sessions } = getSheets_();
   const gameRows = readRows_(games);
   const sessionRows = readRows_(sessions);
-
   const session = sessionRows.find((s) => s.id === sessionId);
   if (!session) throw new Error('세션을 찾지 못했습니다.');
 
   const game = gameRows.find((g) => g.id === session.gameId);
   if (!game) throw new Error('게임을 찾지 못했습니다.');
 
+  const votesA = Number(session.votesA || 0);
+  const votesB = Number(session.votesB || 0);
   const isClosed = session.status === 'closed';
 
   return {
-    game: {
-      id: game.id,
-      title: game.title,
-      optionA: game.optionA,
-      optionB: game.optionB,
-    },
+    game: { id: game.id, title: game.title, optionA: game.optionA, optionB: game.optionB },
     session: {
       id: session.id,
       status: session.status,
-      votes: isClosed ? { A: Number(session.votesA || 0), B: Number(session.votesB || 0) } : { A: null, B: null },
-      totalVotes: isClosed ? Number(session.votesA || 0) + Number(session.votesB || 0) : null,
+      votes: isClosed ? { A: votesA, B: votesB } : { A: null, B: null },
+      totalVotes: isClosed ? votesA + votesB : null,
+      participantCount: votesA + votesB,
       resultVisible: isClosed,
       createdAt: session.createdAt,
       closedAt: session.closedAt || null,
@@ -264,13 +220,11 @@ function vote(body) {
   const sessionId = String(body.sessionId || '');
   const choice = String(body.choice || '');
   const token = String(body.token || '');
-
   if (!sessionId || !token) throw new Error('sessionId, token이 필요합니다.');
   if (choice !== 'A' && choice !== 'B') throw new Error('선택지는 A 또는 B여야 합니다.');
 
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
-
   try {
     const { sessions, votes } = getSheets_();
     const sessionRows = readRows_(sessions);
@@ -299,28 +253,21 @@ function vote(body) {
 function deleteRowsByPredicate_(sheet, predicate) {
   const rows = readRows_(sheet);
   for (let i = rows.length - 1; i >= 0; i -= 1) {
-    if (predicate(rows[i])) {
-      sheet.deleteRow(i + 2);
-    }
+    if (predicate(rows[i])) sheet.deleteRow(i + 2);
   }
 }
 
 function readRows_(sheet) {
   const values = sheet.getDataRange().getValues();
   if (values.length <= 1) return [];
-
   const headers = values[0];
   return values.slice(1).map((row) => {
     const obj = {};
-    headers.forEach((h, idx) => {
-      obj[h] = row[idx];
-    });
+    headers.forEach((h, idx) => { obj[h] = row[idx]; });
     return obj;
   });
 }
 
 function jsonResponse(payload) {
-  return ContentService
-    .createTextOutput(JSON.stringify(payload))
-    .setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(ContentService.MimeType.JSON);
 }

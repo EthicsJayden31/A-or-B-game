@@ -1,14 +1,12 @@
-const apiBaseInputEl = document.getElementById('apiBaseUrl');
-const saveApiConfigBtn = document.getElementById('saveApiConfig');
-const sessionIdInputEl = document.getElementById('sessionIdInput');
-const loadSessionBtn = document.getElementById('loadSession');
 const closeSessionBtn = document.getElementById('closeSession');
-const statusEl = document.getElementById('status');
+const statusEl = document.getElementById('sessionState');
 
 const gameTitleEl = document.getElementById('gameTitle');
 const gameOptionsEl = document.getElementById('gameOptions');
-const sessionStateEl = document.getElementById('sessionState');
+const participantCountEl = document.getElementById('participantCount');
 const resultPanelEl = document.getElementById('resultPanel');
+const resultATitleEl = document.getElementById('resultATitle');
+const resultBTitleEl = document.getElementById('resultBTitle');
 const resultAEl = document.getElementById('resultA');
 const resultBEl = document.getElementById('resultB');
 const resultSummaryEl = document.getElementById('resultSummary');
@@ -22,23 +20,18 @@ function log(message) {
   logsEl.textContent = `[${now}] ${message}\n${logsEl.textContent}`.slice(0, 10000);
 }
 
-function setStatus(text) {
-  statusEl.textContent = text;
-}
-
 function hideResultPanel() {
   resultPanelEl.classList.add('hidden');
-  resultAEl.textContent = 'A: -';
-  resultBEl.textContent = 'B: -';
+  resultATitleEl.textContent = '선택지 A';
+  resultBTitleEl.textContent = '선택지 B';
+  resultAEl.textContent = '-';
+  resultBEl.textContent = '-';
   resultSummaryEl.textContent = '-';
 }
 
 function playFanfare() {
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
-  if (!AudioCtx) {
-    log('브라우저가 오디오 컨텍스트를 지원하지 않아 빵빠레를 재생할 수 없습니다.');
-    return;
-  }
+  if (!AudioCtx) return;
 
   const ctx = new AudioCtx();
   const notes = [523.25, 659.25, 783.99, 1046.5, 783.99, 1046.5];
@@ -47,7 +40,6 @@ function playFanfare() {
   notes.forEach((freq, idx) => {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-
     osc.type = 'triangle';
     osc.frequency.value = freq;
 
@@ -64,8 +56,10 @@ function playFanfare() {
 
 function showClosedResult(data) {
   resultPanelEl.classList.remove('hidden');
-  resultAEl.textContent = `A: ${data.session.votes.A}`;
-  resultBEl.textContent = `B: ${data.session.votes.B}`;
+  resultATitleEl.textContent = data.game.optionA;
+  resultBTitleEl.textContent = data.game.optionB;
+  resultAEl.textContent = `${data.session.votes.A}명`;
+  resultBEl.textContent = `${data.session.votes.B}명`;
   resultSummaryEl.textContent = `총 ${data.session.totalVotes}명 참여 · 세션 종료됨`;
 
   if (fanfarePlayedForSession !== data.session.id) {
@@ -75,91 +69,74 @@ function showClosedResult(data) {
   }
 }
 
-async function loadSession(sessionId) {
-  if (!sessionId) {
-    setStatus('세션 ID를 입력해 주세요.');
-    return;
+function findActiveSessionFromGames(games) {
+  for (const game of games) {
+    const active = (game.sessions || []).find((session) => session.status === 'active');
+    if (active) {
+      return { game, session: active };
+    }
   }
+  return null;
+}
 
+async function loadCurrentSession() {
   try {
-    const data = await window.AorBApi.getSession(sessionId);
-    currentSessionId = sessionId;
-    sessionIdInputEl.value = sessionId;
+    const gamesData = await window.AorBApi.listGames();
+    const active = findActiveSessionFromGames(gamesData.games || []);
 
+    if (!active) {
+      currentSessionId = '';
+      closeSessionBtn.disabled = true;
+      gameTitleEl.textContent = '진행 중 세션 없음';
+      gameOptionsEl.textContent = 'CLIENT에서 세션을 시작해 주세요.';
+      statusEl.textContent = '진행 상태: 없음';
+      participantCountEl.textContent = '실시간 참여자 수: 0명';
+      hideResultPanel();
+      return;
+    }
+
+    const data = await window.AorBApi.getSession(active.session.id);
+    currentSessionId = data.session.id;
     gameTitleEl.textContent = data.game.title;
     gameOptionsEl.textContent = `A: ${data.game.optionA} / B: ${data.game.optionB}`;
-    sessionStateEl.textContent = `진행 상태: ${data.session.status === 'active' ? '진행 중' : '종료됨'}`;
+    participantCountEl.textContent = `실시간 참여자 수: ${data.session.participantCount ?? 0}명`;
 
     if (data.session.status === 'closed') {
-      showClosedResult(data);
+      statusEl.textContent = '진행 상태: 종료됨';
       closeSessionBtn.disabled = true;
-      setStatus('종료된 세션입니다. 결과를 확인하세요.');
+      showClosedResult(data);
     } else {
-      hideResultPanel();
+      statusEl.textContent = '진행 상태: 진행 중 (결과 비공개)';
       closeSessionBtn.disabled = false;
-      setStatus('진행 중인 세션입니다. 종료 전에는 결과를 확인할 수 없습니다.');
+      hideResultPanel();
     }
   } catch (error) {
-    setStatus(error.message);
+    statusEl.textContent = `진행 상태: 오류 (${error.message})`;
     log(`세션 로드 실패: ${error.message}`);
   }
 }
 
-async function pollCurrentSession() {
-  if (!currentSessionId) return;
-  await loadSession(currentSessionId);
-}
-
-saveApiConfigBtn.addEventListener('click', async () => {
-  const saved = window.AorBConfig.setApiBaseUrl(apiBaseInputEl.value);
-  apiBaseInputEl.value = saved;
-  log('Google Apps Script URL 저장 완료');
-
-  if (currentSessionId) {
-    await loadSession(currentSessionId);
-  }
-});
-
-loadSessionBtn.addEventListener('click', async () => {
-  const sessionId = sessionIdInputEl.value.trim();
-  fanfarePlayedForSession = '';
-  await loadSession(sessionId);
-  log(`세션 로드 요청: ${sessionId || '(빈 값)'}`);
-});
-
 closeSessionBtn.addEventListener('click', async () => {
-  if (!currentSessionId) {
-    setStatus('먼저 세션을 불러와 주세요.');
-    return;
-  }
+  if (!currentSessionId) return;
 
-  const yes = window.confirm('세션을 종료하고 결과를 공개할까요? 종료 후 되돌릴 수 없습니다.');
+  const yes = window.confirm('현재 진행 중 세션을 종료하고 결과를 공개할까요?');
   if (!yes) return;
 
   try {
     await window.AorBApi.closeSession(currentSessionId);
     log(`세션 종료 완료: ${currentSessionId}`);
-    await loadSession(currentSessionId);
+    await loadCurrentSession();
   } catch (error) {
-    setStatus(error.message);
     log(`세션 종료 실패: ${error.message}`);
   }
 });
 
-apiBaseInputEl.value = window.AorBConfig.getApiBaseUrl();
-
-const initialSession = new URLSearchParams(window.location.search).get('session');
 const queryApi = new URLSearchParams(window.location.search).get('api');
 if (queryApi) {
-  const saved = window.AorBConfig.setApiBaseUrl(queryApi);
-  apiBaseInputEl.value = saved;
-}
-
-if (initialSession) {
-  sessionIdInputEl.value = initialSession;
-  loadSession(initialSession);
+  window.AorBConfig.setApiBaseUrl(queryApi);
 }
 
 hideResultPanel();
 log('HOST 세션 진행 페이지 준비 완료');
-setInterval(pollCurrentSession, 5000);
+loadCurrentSession();
+setInterval(loadCurrentSession, 5000);

@@ -10,34 +10,29 @@
   <div class="mobile stack">
     <section class="card stack">
       <h1>HOST 세션 진행 페이지</h1>
-      <p class="small">세션 ID를 기반으로 수업 진행을 제어합니다. 세션 종료 전에는 결과를 볼 수 없습니다.</p>
+      <p class="small">진행 중 세션이 자동 연결됩니다. 종료 전에는 참여자 수만 보이고 결과는 비공개입니다.</p>
       <a class="session-link" href="./client.html" target="_blank" rel="noreferrer">CLIENT 관리 페이지 열기</a>
     </section>
 
-    <section class="card stack">
-      <h2>Google Apps Script 연결</h2>
-      <label for="apiBaseUrl">Web App URL</label>
-      <input id="apiBaseUrl" placeholder="https://script.google.com/macros/s/.../exec" />
-      <button id="saveApiConfig">URL 저장</button>
-    </section>
-
-    <section class="card stack">
-      <label for="sessionIdInput">세션 ID</label>
-      <input id="sessionIdInput" placeholder="예: abc123xy" />
-      <button id="loadSession">세션 불러오기</button>
-      <p id="status" class="small">세션을 입력하고 불러오세요.</p>
-    </section>
-
     <section class="card stack" id="sessionPanel">
-      <h2 id="gameTitle">세션 미선택</h2>
+      <h2 id="gameTitle">세션 자동 확인 중...</h2>
       <p class="small" id="gameOptions"></p>
       <p class="small" id="sessionState">진행 상태: -</p>
+      <p class="small" id="participantCount">실시간 참여자 수: -</p>
 
       <div id="resultPanel" class="stack hidden">
         <h3>최종 결과</h3>
-        <div class="kpi">
-          <div class="a" id="resultA">A: -</div>
-          <div class="b" id="resultB">B: -</div>
+        <div class="result-grid">
+          <div class="result-card a" id="resultCardA">
+            <div class="result-icon">🔵</div>
+            <div class="result-title" id="resultATitle">선택지 A</div>
+            <div class="result-value" id="resultA">-</div>
+          </div>
+          <div class="result-card b" id="resultCardB">
+            <div class="result-icon">🔴</div>
+            <div class="result-title" id="resultBTitle">선택지 B</div>
+            <div class="result-value" id="resultB">-</div>
+          </div>
         </div>
         <p class="small" id="resultSummary">-</p>
       </div>
