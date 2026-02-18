@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>A-or-B HOST (세션 진행)</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="mobile stack">
+    <section class="card stack">
+      <h1>HOST 세션 진행 페이지</h1>
+      <p class="small">진행 중 세션이 자동 연결됩니다. 종료 전에는 참여자 수만 보이고 결과는 비공개입니다.</p>
+      <a class="session-link" href="./client.html" target="_blank" rel="noreferrer">CLIENT 관리 페이지 열기</a>
+    </section>
+
+    <section class="card stack" id="sessionPanel">
+      <h2 id="gameTitle">세션 자동 확인 중...</h2>
+      <p class="small" id="gameOptions"></p>
+      <p class="small" id="sessionState">진행 상태: -</p>
+      <p class="small" id="participantCount">실시간 참여자 수: -</p>
+
+      <div id="resultPanel" class="stack hidden">
+        <h3>최종 결과</h3>
+        <div class="result-grid">
+          <div class="result-card a" id="resultCardA">
+            <div class="result-icon">🔵</div>
+            <div class="result-title" id="resultATitle">선택지 A</div>
+            <div class="result-value" id="resultA">-</div>
+          </div>
+          <div class="result-card b" id="resultCardB">
+            <div class="result-icon">🔴</div>
+            <div class="result-title" id="resultBTitle">선택지 B</div>
+            <div class="result-value" id="resultB">-</div>
+          </div>
+        </div>
+        <p class="small" id="resultSummary">-</p>
+      </div>
+
+      <button id="closeSession" class="danger">세션 종료 및 결과 공개</button>
+    </section>
+
+    <section class="card stack">
+      <h2>실시간 로그</h2>
+      <pre id="logs" class="log-box"></pre>
+    </section>
+  </div>
+
+  <script src="./config.js"></script>
+  <script src="./api.js"></script>
+  <script src="./host.js"></script>
+</body>
+</html>
