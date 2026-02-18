@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>A-or-B HOST</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="container stack">
+    <h1>A or B 게임 설계 및 운영</h1>
+    <p class="small">수업에서 즉시 사용 가능한 세션을 만들고 QR코드로 배포하세요.</p>
+
+    <section class="card stack">
+      <h2>새 게임 설계</h2>
+      <form id="createGameForm" class="grid grid-2">
+        <div>
+          <label for="title">제목</label>
+          <input id="title" name="title" maxlength="80" required placeholder="예: AI는 숙제에 도움이 된다" />
+        </div>
+        <div>
+          <label for="optionA">선택지 A</label>
+          <input id="optionA" name="optionA" maxlength="50" required placeholder="예: 찬성" />
+        </div>
+        <div>
+          <label for="optionB">선택지 B</label>
+          <input id="optionB" name="optionB" maxlength="50" required placeholder="예: 반대" />
+        </div>
+        <div style="display:flex; align-items:end;">
+          <button class="primary" type="submit">게임 저장</button>
+        </div>
+      </form>
+      <p id="status" class="small"></p>
+    </section>
+
+    <section class="stack" id="games"></section>
+  </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script src="/host.js"></script>
+</body>
+</html>
