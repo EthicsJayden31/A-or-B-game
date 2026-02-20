@@ -26,7 +26,7 @@ function showClosedResult(payload) {
   const total = payload.totalVotes || 0;
   const aPercent = total ? Math.round((payload.votes.A / total) * 100) : 0;
   const bPercent = total ? Math.round((payload.votes.B / total) * 100) : 0;
-  setMessage(`세션이 종료되었습니다. 결과 공개!\n${payload.optionA}: ${payload.votes.A}명 (${aPercent}%)\n${payload.optionB}: ${payload.votes.B}명 (${bPercent}%)`);
+  setMessage(`투표가 종료되었습니다. 결과 공개!\n${payload.optionA}: ${payload.votes.A}명 (${aPercent}%)\n${payload.optionB}: ${payload.votes.B}명 (${bPercent}%)`);
   showChoices(false);
 }
 
@@ -38,20 +38,33 @@ function getParticipantToken(sessionId) {
   return token;
 }
 
-function findActiveSessionFromGames(games) {
+function findCurrentSessionFromGames(games) {
+  let latestClosed = null;
+
   for (const game of games) {
     const active = (game.sessions || []).find((session) => session.status === 'active');
-    if (active) return active.id;
+    if (active) {
+      return { game, session: active };
+    }
+
+    for (const session of (game.sessions || [])) {
+      if (session.status === 'closed') {
+        if (!latestClosed || String(session.closedAt || session.createdAt) > String(latestClosed.session.closedAt || latestClosed.session.createdAt)) {
+          latestClosed = { game, session };
+        }
+      }
+    }
   }
-  return '';
+
+  return latestClosed;
 }
 
 async function loadSession() {
   try {
     const gamesData = await window.AorBApi.listGames();
-    const activeSessionId = findActiveSessionFromGames(gamesData.games || []);
+    const current = findCurrentSessionFromGames(gamesData.games || []);
 
-    if (!activeSessionId) {
+    if (!current) {
       currentSessionId = '';
       titleEl.textContent = '진행 중 세션이 없습니다.';
       optionsEl.textContent = '';
@@ -60,8 +73,8 @@ async function loadSession() {
       return;
     }
 
-    const data = await window.AorBApi.getSession(activeSessionId);
-    currentSessionId = activeSessionId;
+    const data = await window.AorBApi.getSession(current.session.id);
+    currentSessionId = current.session.id;
     localSession = data;
 
     titleEl.textContent = data.game.title;
@@ -74,7 +87,7 @@ async function loadSession() {
       return;
     }
 
-    setMessage('하나를 선택하고 HOST가 세션을 종료할 때까지 기다려 주세요.');
+    setMessage('하나를 선택하고 HOST가 투표를 종료할 때까지 기다려 주세요.');
     showChoices(true);
   } catch (error) {
     titleEl.textContent = '세션을 불러오지 못했습니다.';

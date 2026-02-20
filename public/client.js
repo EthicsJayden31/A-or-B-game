@@ -4,6 +4,8 @@ const statusEl = document.getElementById('status');
 const apiBaseInputEl = document.getElementById('apiBaseUrl');
 const saveApiConfigBtn = document.getElementById('saveApiConfig');
 const logsEl = document.getElementById('logs');
+const hostEntryLinkEl = document.getElementById('hostEntryLink');
+const participantEntryLinkEl = document.getElementById('participantEntryLink');
 
 function log(message) {
   const now = new Date().toLocaleTimeString('ko-KR');
@@ -26,6 +28,13 @@ function hostRunUrl() {
   const api = window.AorBConfig.getApiBaseUrl();
   if (api) url.searchParams.set('api', api);
   return url.toString();
+}
+
+function refreshEntryLinks() {
+  const hostUrl = hostRunUrl();
+  const participantUrl = participantJoinUrl();
+  if (hostEntryLinkEl) hostEntryLinkEl.href = hostUrl;
+  if (participantEntryLinkEl) participantEntryLinkEl.href = participantUrl;
 }
 
 async function fetchGames() {
@@ -167,10 +176,12 @@ saveApiConfigBtn.addEventListener('click', async () => {
   apiBaseInputEl.value = saved;
   statusEl.textContent = 'Google Apps Script URL이 저장되었습니다.';
   log('Google Apps Script URL 저장 완료');
+  refreshEntryLinks();
   await refreshGames();
 });
 
 apiBaseInputEl.value = window.AorBConfig.getApiBaseUrl();
 log('CLIENT 페이지 준비 완료');
+refreshEntryLinks();
 refreshGames();
 setInterval(refreshGames, 5000);

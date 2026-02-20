@@ -7,7 +7,7 @@
 - `test.html`: 시뮬레이션 페이지 (URL 설정 UI 없음, CLIENT 설정값 사용)
 
 ## 변경된 운영 규칙
-1. **Apps Script 연결은 CLIENT에서만 가능**
+1. **Apps Script 연결은 CLIENT에서만 가능** (HOST/PARTICIPANT는 CLIENT 링크로 접속 시 자동 연결)
 2. **한 번에 하나의 active 세션만 운영 가능**
 3. HOST는 세션 진행 중 **참여자 수만 확인** 가능 (결과 비공개)
 4. 세션 종료 시에만 최종 결과 공개
@@ -21,7 +21,7 @@
 ## 운영 흐름
 1. CLIENT에서 게임 생성
 2. CLIENT에서 세션 시작 (다른 active 세션이 있으면 시작 불가)
-3. CLIENT가 제공한 HOST/PARTICIPANT 링크 공유
+3. CLIENT가 제공한 HOST/PARTICIPANT 링크(이미 API 주소 포함) 공유
 4. HOST에서 진행 중 참여자 수 확인
 5. HOST가 세션 종료 -> 결과 공개 + 빵빠레
 

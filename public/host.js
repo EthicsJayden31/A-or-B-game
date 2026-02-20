@@ -60,34 +60,45 @@ function showClosedResult(data) {
   resultBTitleEl.textContent = data.game.optionB;
   resultAEl.textContent = `${data.session.votes.A}명`;
   resultBEl.textContent = `${data.session.votes.B}명`;
-  resultSummaryEl.textContent = `총 ${data.session.totalVotes}명 참여 · 세션 종료됨`;
+  resultSummaryEl.textContent = `총 ${data.session.totalVotes}명 참여 · 투표 종료`;
 
   if (fanfarePlayedForSession !== data.session.id) {
     playFanfare();
     fanfarePlayedForSession = data.session.id;
-    log('세션 종료! 결과 공개와 함께 빵빠레를 재생했습니다.');
+    log('투표 종료! 결과 공개와 함께 빵빠레를 재생했습니다.');
   }
 }
 
-function findActiveSessionFromGames(games) {
+function findCurrentSessionFromGames(games) {
+  let latestClosed = null;
+
   for (const game of games) {
     const active = (game.sessions || []).find((session) => session.status === 'active');
     if (active) {
-      return { game, session: active };
+      return { mode: 'active', game, session: active };
+    }
+
+    for (const session of (game.sessions || [])) {
+      if (session.status === 'closed') {
+        if (!latestClosed || String(session.closedAt || session.createdAt) > String(latestClosed.session.closedAt || latestClosed.session.createdAt)) {
+          latestClosed = { mode: 'closed', game, session };
+        }
+      }
     }
   }
-  return null;
+
+  return latestClosed;
 }
 
 async function loadCurrentSession() {
   try {
     const gamesData = await window.AorBApi.listGames();
-    const active = findActiveSessionFromGames(gamesData.games || []);
+    const current = findCurrentSessionFromGames(gamesData.games || []);
 
-    if (!active) {
+    if (!current) {
       currentSessionId = '';
       closeSessionBtn.disabled = true;
-      gameTitleEl.textContent = '진행 중 세션 없음';
+      gameTitleEl.textContent = '진행/종료된 세션 없음';
       gameOptionsEl.textContent = 'CLIENT에서 세션을 시작해 주세요.';
       statusEl.textContent = '진행 상태: 없음';
       participantCountEl.textContent = '실시간 참여자 수: 0명';
@@ -95,18 +106,18 @@ async function loadCurrentSession() {
       return;
     }
 
-    const data = await window.AorBApi.getSession(active.session.id);
+    const data = await window.AorBApi.getSession(current.session.id);
     currentSessionId = data.session.id;
     gameTitleEl.textContent = data.game.title;
     gameOptionsEl.textContent = `A: ${data.game.optionA} / B: ${data.game.optionB}`;
     participantCountEl.textContent = `실시간 참여자 수: ${data.session.participantCount ?? 0}명`;
 
     if (data.session.status === 'closed') {
-      statusEl.textContent = '진행 상태: 종료됨';
+      statusEl.textContent = '진행 상태: 투표 종료';
       closeSessionBtn.disabled = true;
       showClosedResult(data);
     } else {
-      statusEl.textContent = '진행 상태: 진행 중 (결과 비공개)';
+      statusEl.textContent = '진행 상태: 투표 진행 중 (결과 비공개)';
       closeSessionBtn.disabled = false;
       hideResultPanel();
     }
@@ -119,15 +130,15 @@ async function loadCurrentSession() {
 closeSessionBtn.addEventListener('click', async () => {
   if (!currentSessionId) return;
 
-  const yes = window.confirm('현재 진행 중 세션을 종료하고 결과를 공개할까요?');
+  const yes = window.confirm('현재 진행 중 세션의 투표를 종료하고 결과를 공개할까요?');
   if (!yes) return;
 
   try {
     await window.AorBApi.closeSession(currentSessionId);
-    log(`세션 종료 완료: ${currentSessionId}`);
+    log(`투표 종료 완료: ${currentSessionId}`);
     await loadCurrentSession();
   } catch (error) {
-    log(`세션 종료 실패: ${error.message}`);
+    log(`투표 종료 실패: ${error.message}`);
   }
 });
 
