@@ -34,6 +34,10 @@ function playFanfare() {
   if (!AudioCtx) return;
 
   const ctx = new AudioCtx();
+  if (ctx.state === 'suspended') {
+    ctx.resume();
+  }
+
   const notes = [523.25, 659.25, 783.99, 1046.5, 783.99, 1046.5];
   const start = ctx.currentTime;
 
@@ -61,12 +65,6 @@ function showClosedResult(data) {
   resultAEl.textContent = `${data.session.votes.A}명`;
   resultBEl.textContent = `${data.session.votes.B}명`;
   resultSummaryEl.textContent = `총 ${data.session.totalVotes}명 참여 · 투표 종료`;
-
-  if (fanfarePlayedForSession !== data.session.id) {
-    playFanfare();
-    fanfarePlayedForSession = data.session.id;
-    log('투표 종료! 결과 공개와 함께 빵빠레를 재생했습니다.');
-  }
 }
 
 function findCurrentSessionFromGames(games) {
@@ -135,6 +133,8 @@ closeSessionBtn.addEventListener('click', async () => {
 
   try {
     await window.AorBApi.closeSession(currentSessionId);
+    fanfarePlayedForSession = currentSessionId;
+    playFanfare();
     log(`투표 종료 완료: ${currentSessionId}`);
     await loadCurrentSession();
   } catch (error) {

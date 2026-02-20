@@ -13,6 +13,7 @@ const choiceBEl = document.getElementById('choiceB');
 
 let currentSessionId = '';
 let localSession;
+let isSubmitting = false;
 
 function setMessage(text) {
   messageEl.innerText = text;
@@ -20,6 +21,14 @@ function setMessage(text) {
 
 function showChoices(show) {
   choiceAreaEl.classList.toggle('hidden', !show);
+}
+
+function setChoiceState(selected) {
+  choiceAEl.classList.toggle('selected', selected === 'A');
+  choiceBEl.classList.toggle('selected', selected === 'B');
+  const disabled = !!selected || isSubmitting;
+  choiceAEl.disabled = disabled;
+  choiceBEl.disabled = disabled;
 }
 
 function showClosedResult(payload) {
@@ -87,7 +96,10 @@ async function loadSession() {
       return;
     }
 
-    setMessage('하나를 선택하고 HOST가 투표를 종료할 때까지 기다려 주세요.');
+    if (!isSubmitting) {
+      setChoiceState('');
+      setMessage('하나를 선택하고 HOST가 투표를 종료할 때까지 기다려 주세요.');
+    }
     showChoices(true);
   } catch (error) {
     titleEl.textContent = '세션을 불러오지 못했습니다.';
@@ -97,14 +109,20 @@ async function loadSession() {
 }
 
 async function sendVote(choice) {
+  if (isSubmitting) return;
   if (!currentSessionId || !localSession || localSession.session.status !== 'active') return;
+
+  isSubmitting = true;
+  setChoiceState(choice);
+  setMessage('선택을 저장 중입니다...');
 
   try {
     const token = getParticipantToken(currentSessionId);
     await window.AorBApi.vote(currentSessionId, choice, token);
-    showChoices(false);
-    setMessage('선택이 저장되었습니다. HOST가 결과를 공개할 때까지 대기해 주세요.');
+    setMessage(`✅ ${choice === 'A' ? localSession.game.optionA : localSession.game.optionB} 선택이 저장되었습니다. HOST가 결과를 공개할 때까지 대기해 주세요.`);
   } catch (error) {
+    isSubmitting = false;
+    setChoiceState('');
     setMessage(error.message);
   }
 }

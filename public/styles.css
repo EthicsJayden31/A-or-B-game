@@ -96,3 +96,6 @@ button.danger { background: linear-gradient(180deg, #dc2626, #b91c1c); border-co
   font-size: 0.85rem;
   white-space: pre-wrap;
 }
+
+.choice:disabled { cursor: not-allowed; opacity: 0.78; }
+.choice.selected { box-shadow: 0 0 0 3px rgba(255,255,255,0.65) inset, 0 0 24px rgba(255,255,255,0.2); transform: scale(1.01); }
