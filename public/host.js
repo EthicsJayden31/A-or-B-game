@@ -8,12 +8,31 @@ const resultGridEl = document.getElementById('resultGrid');
 const reasonCloudAreaEl = document.getElementById('reasonCloudArea');
 const resultSummaryEl = document.getElementById('resultSummary');
 const logsEl = document.getElementById('logs');
+const loadingOverlayEl = createLoadingOverlay();
 
 let currentSessionId = '';
 
 function log(message) {
   const now = new Date().toLocaleTimeString('ko-KR');
   logsEl.textContent = `[${now}] ${message}\n${logsEl.textContent}`.slice(0, 10000);
+}
+
+function createLoadingOverlay() {
+  const overlay = document.createElement('div');
+  overlay.className = 'loading-overlay hidden';
+  overlay.innerHTML = `
+    <div class="loading-box">
+      <span class="gear">⚙️</span>
+      <div class="loading-text">처리 중...</div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+function showLoading(show, text = '처리 중...') {
+  loadingOverlayEl.querySelector('.loading-text').textContent = text;
+  loadingOverlayEl.classList.toggle('hidden', !show);
 }
 
 function hideResultPanel() {
@@ -90,8 +109,9 @@ function findCurrentSessionFromGames(games) {
   return latestClosed;
 }
 
-async function loadCurrentSession() {
+async function loadCurrentSession(silent = false) {
   try {
+    if (!silent) showLoading(true, '세션 동기화 중...');
     const gamesData = await window.AorBApi.listGames();
     const current = findCurrentSessionFromGames(gamesData.games || []);
 
@@ -103,6 +123,7 @@ async function loadCurrentSession() {
       statusEl.textContent = '진행 상태: 없음';
       participantCountEl.textContent = '실시간 참여자 수: 0명';
       hideResultPanel();
+      if (!silent) showLoading(false);
       return;
     }
 
@@ -121,9 +142,11 @@ async function loadCurrentSession() {
       closeSessionBtn.disabled = false;
       hideResultPanel();
     }
+    if (!silent) showLoading(false);
   } catch (error) {
     statusEl.textContent = `진행 상태: 오류 (${error.message})`;
     log(`세션 로드 실패: ${error.message}`);
+    if (!silent) showLoading(false);
   }
 }
 
@@ -134,11 +157,13 @@ closeSessionBtn.addEventListener('click', async () => {
   if (!yes) return;
 
   try {
+    showLoading(true, '세션 종료 처리 중...');
     await window.AorBApi.closeSession(currentSessionId);
     log(`투표 종료 완료: ${currentSessionId}`);
     await loadCurrentSession();
   } catch (error) {
     log(`투표 종료 실패: ${error.message}`);
+    showLoading(false);
   }
 });
 
@@ -148,4 +173,4 @@ if (queryApi) window.AorBConfig.setApiBaseUrl(queryApi);
 hideResultPanel();
 log('HOST 세션 진행 페이지 준비 완료');
 loadCurrentSession();
-setInterval(loadCurrentSession, 5000);
+setInterval(() => loadCurrentSession(true), 5000);

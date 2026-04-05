@@ -5,6 +5,7 @@ const hostSessionLinkEl = document.getElementById('hostSessionLink');
 const closeSessionBtn = document.getElementById('closeSession');
 const resultListEl = document.getElementById('resultList');
 const logsEl = document.getElementById('logs');
+const loadingOverlayEl = createLoadingOverlay();
 
 let currentGame;
 let currentSession;
@@ -12,6 +13,24 @@ let currentSession;
 function log(message) {
   const now = new Date().toLocaleTimeString('ko-KR');
   logsEl.textContent = `[${now}] ${message}\n${logsEl.textContent}`.slice(0, 10000);
+}
+
+function createLoadingOverlay() {
+  const overlay = document.createElement('div');
+  overlay.className = 'loading-overlay hidden';
+  overlay.innerHTML = `
+    <div class="loading-box">
+      <span class="gear">⚙️</span>
+      <div class="loading-text">처리 중...</div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+function showLoading(show, text = '처리 중...') {
+  loadingOverlayEl.querySelector('.loading-text').textContent = text;
+  loadingOverlayEl.classList.toggle('hidden', !show);
 }
 
 function participantJoinUrl() {
@@ -44,6 +63,7 @@ testForm.addEventListener('submit', async (event) => {
   }
 
   try {
+    showLoading(true, '세션 생성 중...');
     const gameData = await window.AorBApi.createGame(title, options);
     currentGame = gameData.game;
     const sessionData = await window.AorBApi.startSession(currentGame.id);
@@ -56,8 +76,10 @@ testForm.addEventListener('submit', async (event) => {
     hostSessionLinkEl.textContent = `HOST 링크: ${hostSessionLinkEl.href}`;
     resultListEl.textContent = '세션 진행 중입니다.';
     log(`테스트 세션 생성 완료 (${currentSession.id})`);
+    showLoading(false);
   } catch (error) {
     log(`오류: ${error.message}`);
+    showLoading(false);
   }
 });
 
@@ -68,6 +90,7 @@ closeSessionBtn.addEventListener('click', async () => {
   }
 
   try {
+    showLoading(true, '세션 종료 중...');
     await window.AorBApi.closeSession(currentSession.id);
     const data = await window.AorBApi.getSession(currentSession.id);
     resultListEl.innerHTML = (data.game.options || []).map((opt) => {
@@ -75,8 +98,10 @@ closeSessionBtn.addEventListener('click', async () => {
       return `<div>${opt.text}: ${count}</div>`;
     }).join('');
     log('세션 종료 완료');
+    showLoading(false);
   } catch (error) {
     log(`오류: ${error.message}`);
+    showLoading(false);
   }
 });
 

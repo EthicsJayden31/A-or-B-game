@@ -8,6 +8,7 @@ const hostEntryLinkEl = document.getElementById('hostEntryLink');
 const participantEntryLinkEl = document.getElementById('participantEntryLink');
 const optionInputsEl = document.getElementById('optionInputs');
 const addOptionBtn = document.getElementById('addOption');
+const loadingOverlayEl = createLoadingOverlay();
 
 function log(message) {
   const now = new Date().toLocaleTimeString('ko-KR');
@@ -37,6 +38,24 @@ function refreshEntryLinks() {
   const participantUrl = participantJoinUrl();
   if (hostEntryLinkEl) hostEntryLinkEl.href = hostUrl;
   if (participantEntryLinkEl) participantEntryLinkEl.href = participantUrl;
+}
+
+function createLoadingOverlay() {
+  const overlay = document.createElement('div');
+  overlay.className = 'loading-overlay hidden';
+  overlay.innerHTML = `
+    <div class="loading-box">
+      <span class="gear">⚙️</span>
+      <div class="loading-text">처리 중...</div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+function showLoading(show, text = '처리 중...') {
+  loadingOverlayEl.querySelector('.loading-text').textContent = text;
+  loadingOverlayEl.classList.toggle('hidden', !show);
 }
 
 function createOptionInput(value = '') {
@@ -133,13 +152,16 @@ function renderGames(games) {
   gamesEl.innerHTML = games.map((game) => gameTemplate(game, hasActiveSession)).join('');
 }
 
-async function refreshGames() {
+async function refreshGames(silent = false) {
   try {
+    if (!silent) showLoading(true, '목록 불러오는 중...');
     const data = await window.AorBApi.listGames();
     renderGames(data.games || []);
+    if (!silent) showLoading(false);
   } catch (error) {
     statusEl.textContent = error.message;
     log(`오류: ${error.message}`);
+    if (!silent) showLoading(false);
   }
 }
 
@@ -156,6 +178,7 @@ form.addEventListener('submit', async (event) => {
   }
 
   try {
+    showLoading(true, '조사 저장 중...');
     await window.AorBApi.createGame(title, options);
     form.reset();
     initializeOptionInputs();
@@ -165,6 +188,7 @@ form.addEventListener('submit', async (event) => {
   } catch (error) {
     statusEl.textContent = error.message;
     log(`조사 저장 실패: ${error.message}`);
+    showLoading(false);
   }
 });
 
@@ -174,6 +198,7 @@ gamesEl.addEventListener('click', async (event) => {
 
   const { action } = button.dataset;
   try {
+    showLoading(true, '요청 처리 중...');
     if (action === 'start-session') {
       await window.AorBApi.startSession(button.dataset.gameId);
       log(`세션 시작 완료 (gameId: ${button.dataset.gameId})`);
@@ -197,6 +222,7 @@ gamesEl.addEventListener('click', async (event) => {
   } catch (error) {
     statusEl.textContent = error.message;
     log(`요청 실패: ${error.message}`);
+    showLoading(false);
   }
 });
 
@@ -206,7 +232,7 @@ saveApiConfigBtn.addEventListener('click', async () => {
   statusEl.textContent = 'Google Apps Script URL이 저장되었습니다.';
   log('Google Apps Script URL 저장 완료');
   refreshEntryLinks();
-  await refreshGames();
+  await refreshGames(true);
 });
 
 apiBaseInputEl.value = window.AorBConfig.getApiBaseUrl();
@@ -214,4 +240,4 @@ initializeOptionInputs();
 log('CLIENT 페이지 준비 완료');
 refreshEntryLinks();
 refreshGames();
-setInterval(refreshGames, 5000);
+setInterval(() => refreshGames(true), 5000);
