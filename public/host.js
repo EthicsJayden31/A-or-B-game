@@ -1,19 +1,15 @@
 const closeSessionBtn = document.getElementById('closeSession');
 const statusEl = document.getElementById('sessionState');
-
 const gameTitleEl = document.getElementById('gameTitle');
 const gameOptionsEl = document.getElementById('gameOptions');
 const participantCountEl = document.getElementById('participantCount');
 const resultPanelEl = document.getElementById('resultPanel');
-const resultATitleEl = document.getElementById('resultATitle');
-const resultBTitleEl = document.getElementById('resultBTitle');
-const resultAEl = document.getElementById('resultA');
-const resultBEl = document.getElementById('resultB');
+const resultGridEl = document.getElementById('resultGrid');
+const reasonCloudAreaEl = document.getElementById('reasonCloudArea');
 const resultSummaryEl = document.getElementById('resultSummary');
 const logsEl = document.getElementById('logs');
 
 let currentSessionId = '';
-let fanfarePlayedForSession = '';
 
 function log(message) {
   const now = new Date().toLocaleTimeString('ko-KR');
@@ -22,59 +18,66 @@ function log(message) {
 
 function hideResultPanel() {
   resultPanelEl.classList.add('hidden');
-  resultATitleEl.textContent = '선택지 A';
-  resultBTitleEl.textContent = '선택지 B';
-  resultAEl.textContent = '-';
-  resultBEl.textContent = '-';
+  resultGridEl.innerHTML = '';
+  reasonCloudAreaEl.innerHTML = '';
   resultSummaryEl.textContent = '-';
 }
 
-function playFanfare() {
-  const AudioCtx = window.AudioContext || window.webkitAudioContext;
-  if (!AudioCtx) return;
+function toPercent(value, total) {
+  return total ? Math.round((value / total) * 100) : 0;
+}
 
-  const ctx = new AudioCtx();
-  if (ctx.state === 'suspended') {
-    ctx.resume();
-  }
+function renderResultCards(data) {
+  const options = data.game.options || [];
+  const total = data.session.totalVotes || 0;
 
-  const notes = [523.25, 659.25, 783.99, 1046.5, 783.99, 1046.5];
-  const start = ctx.currentTime;
+  resultGridEl.innerHTML = options.map((opt) => {
+    const count = data.session.votes?.[opt.id] ?? 0;
+    const pct = toPercent(count, total);
+    return `
+      <div class="result-card">
+        <div class="result-title">${opt.text}</div>
+        <div class="result-value">${count}</div>
+        <div class="result-percent">${pct}%</div>
+      </div>
+    `;
+  }).join('');
+}
 
-  notes.forEach((freq, idx) => {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'triangle';
-    osc.frequency.value = freq;
+function renderWordCloud(words, colorSeed) {
+  if (!words.length) return '<p class="small">사유 데이터가 없습니다.</p>';
+  const max = words.reduce((acc, item) => Math.max(acc, item.count), 1);
+  return `<div class="word-cloud">${words.map((item, idx) => {
+    const scale = 1 + ((item.count / max) * 1.2);
+    const hue = (colorSeed + idx * 17) % 360;
+    return `<span class="word-chip" style="font-size:${scale.toFixed(2)}rem; background:hsl(${hue} 95% 94%); color:hsl(${hue} 55% 32%);">${item.word} (${item.count})</span>`;
+  }).join('')}</div>`;
+}
 
-    gain.gain.setValueAtTime(0.0001, start + idx * 0.15);
-    gain.gain.exponentialRampToValueAtTime(0.22, start + idx * 0.15 + 0.03);
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + idx * 0.15 + 0.14);
+function renderReasonCloud(data) {
+  const options = data.game.options || [];
+  const clouds = data.session.reasonCloudByOption || {};
 
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(start + idx * 0.15);
-    osc.stop(start + idx * 0.15 + 0.14);
-  });
+  reasonCloudAreaEl.innerHTML = options.map((opt, idx) => `
+    <div class="card stack">
+      <h3>${opt.text}</h3>
+      ${renderWordCloud(clouds[opt.id] || [], 220 + idx * 45)}
+    </div>
+  `).join('');
 }
 
 function showClosedResult(data) {
   resultPanelEl.classList.remove('hidden');
-  resultATitleEl.textContent = data.game.optionA;
-  resultBTitleEl.textContent = data.game.optionB;
-  resultAEl.textContent = `${data.session.votes.A}명`;
-  resultBEl.textContent = `${data.session.votes.B}명`;
-  resultSummaryEl.textContent = `총 ${data.session.totalVotes}명 참여 · 투표 종료`;
+  renderResultCards(data);
+  renderReasonCloud(data);
+  resultSummaryEl.textContent = `총 ${data.session.totalVotes || 0}명 참여 · 투표 종료`;
 }
 
 function findCurrentSessionFromGames(games) {
   let latestClosed = null;
-
   for (const game of games) {
     const active = (game.sessions || []).find((session) => session.status === 'active');
-    if (active) {
-      return { mode: 'active', game, session: active };
-    }
+    if (active) return { mode: 'active', game, session: active };
 
     for (const session of (game.sessions || [])) {
       if (session.status === 'closed') {
@@ -84,7 +87,6 @@ function findCurrentSessionFromGames(games) {
       }
     }
   }
-
   return latestClosed;
 }
 
@@ -107,7 +109,7 @@ async function loadCurrentSession() {
     const data = await window.AorBApi.getSession(current.session.id);
     currentSessionId = data.session.id;
     gameTitleEl.textContent = data.game.title;
-    gameOptionsEl.textContent = `A: ${data.game.optionA} / B: ${data.game.optionB}`;
+    gameOptionsEl.textContent = `선택지: ${(data.game.options || []).map((o) => o.text).join(' / ')}`;
     participantCountEl.textContent = `실시간 참여자 수: ${data.session.participantCount ?? 0}명`;
 
     if (data.session.status === 'closed') {
@@ -133,8 +135,6 @@ closeSessionBtn.addEventListener('click', async () => {
 
   try {
     await window.AorBApi.closeSession(currentSessionId);
-    fanfarePlayedForSession = currentSessionId;
-    playFanfare();
     log(`투표 종료 완료: ${currentSessionId}`);
     await loadCurrentSession();
   } catch (error) {
@@ -143,9 +143,7 @@ closeSessionBtn.addEventListener('click', async () => {
 });
 
 const queryApi = new URLSearchParams(window.location.search).get('api');
-if (queryApi) {
-  window.AorBConfig.setApiBaseUrl(queryApi);
-}
+if (queryApi) window.AorBConfig.setApiBaseUrl(queryApi);
 
 hideResultPanel();
 log('HOST 세션 진행 페이지 준비 완료');

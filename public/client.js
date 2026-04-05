@@ -6,6 +6,8 @@ const saveApiConfigBtn = document.getElementById('saveApiConfig');
 const logsEl = document.getElementById('logs');
 const hostEntryLinkEl = document.getElementById('hostEntryLink');
 const participantEntryLinkEl = document.getElementById('participantEntryLink');
+const optionInputsEl = document.getElementById('optionInputs');
+const addOptionBtn = document.getElementById('addOption');
 
 function log(message) {
   const now = new Date().toLocaleTimeString('ko-KR');
@@ -37,16 +39,51 @@ function refreshEntryLinks() {
   if (participantEntryLinkEl) participantEntryLinkEl.href = participantUrl;
 }
 
-async function fetchGames() {
-  const data = await window.AorBApi.listGames();
-  return data.games || [];
+function createOptionInput(value = '') {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'grid';
+  wrapper.innerHTML = `
+    <div style="display:flex; gap:0.5rem; align-items:center;">
+      <input name="options" maxlength="50" required placeholder="선택지를 입력하세요" value="${value}" />
+      <button type="button" class="ghost remove-option" style="width:auto; padding:0.7rem 1rem;">삭제</button>
+    </div>
+  `;
+  wrapper.querySelector('.remove-option').addEventListener('click', () => {
+    if (optionInputsEl.querySelectorAll('input[name="options"]').length <= 2) {
+      statusEl.textContent = '선택지는 최소 2개가 필요합니다.';
+      return;
+    }
+    wrapper.remove();
+    updateOptionButtons();
+  });
+  return wrapper;
 }
 
-function sessionTemplate(session) {
+function updateOptionButtons() {
+  const count = optionInputsEl.querySelectorAll('input[name="options"]').length;
+  addOptionBtn.disabled = count >= 5;
+}
+
+function initializeOptionInputs() {
+  optionInputsEl.innerHTML = '';
+  optionInputsEl.appendChild(createOptionInput(''));
+  optionInputsEl.appendChild(createOptionInput(''));
+  updateOptionButtons();
+}
+
+addOptionBtn.addEventListener('click', () => {
+  const count = optionInputsEl.querySelectorAll('input[name="options"]').length;
+  if (count >= 5) return;
+  optionInputsEl.appendChild(createOptionInput(''));
+  updateOptionButtons();
+});
+
+function sessionTemplate(session, gameOptions) {
   const statusClass = session.status === 'active' ? 'active' : 'closed';
   const statusText = session.status === 'active' ? '진행 중' : '종료됨';
+
   const resultBlock = session.status === 'closed'
-    ? `<div class="kpi"><div class="a">${session.optionA}: ${session.votes.A}</div><div class="b">${session.optionB}: ${session.votes.B}</div></div><p class="small">총 응답: ${session.totalVotes}명</p>`
+    ? `<div class="kpi">${gameOptions.map((opt) => `<div>${opt.text}: ${session.votes?.[opt.id] ?? 0}</div>`).join('')}</div><p class="small">총 응답: ${session.totalVotes ?? 0}명</p>`
     : `<p class="small">참여자 수: ${session.participantCount ?? 0}명 · 결과 비공개</p>`;
 
   return `
@@ -63,29 +100,24 @@ function sessionTemplate(session) {
 }
 
 function gameTemplate(game, hasActiveSession) {
-  const sessionList = game.sessions.length
-    ? game.sessions.map((session) => sessionTemplate(session)).join('')
+  const sessionList = (game.sessions || []).length
+    ? game.sessions.map((session) => sessionTemplate(session, game.options || [])).join('')
     : '<p class="small">아직 세션이 없습니다. 새 세션을 시작하세요.</p>';
 
   const startDisabled = hasActiveSession ? 'disabled' : '';
-  const startHelp = hasActiveSession
-    ? '<p class="small">현재 다른 진행 중 세션이 있어 새 세션을 시작할 수 없습니다.</p>'
-    : '';
-
   return `
     <article class="card stack">
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem; flex-wrap:wrap;">
         <div class="stack" style="gap:0.3rem;">
           <h3>${game.title}</h3>
-          <p class="small">A: ${game.optionA} / B: ${game.optionB}</p>
+          <p class="small">선택지: ${(game.options || []).map((o) => o.text).join(' / ')}</p>
           <p class="small">생성: ${formatDate(game.createdAt)}</p>
         </div>
-        <div class="stack" style="gap:0.4rem; width: 220px;">
+        <div class="stack" style="gap:0.4rem; width: 230px; max-width:100%;">
           <button data-action="start-session" data-game-id="${game.id}" ${startDisabled}>새 세션 시작</button>
-          <button data-action="delete-game" data-game-id="${game.id}" class="danger">게임 전체 삭제</button>
+          <button data-action="delete-game" data-game-id="${game.id}" class="danger">조사 전체 삭제</button>
         </div>
       </div>
-      ${startHelp}
       <div class="grid grid-2">${sessionList}</div>
     </article>
   `;
@@ -93,27 +125,18 @@ function gameTemplate(game, hasActiveSession) {
 
 function renderGames(games) {
   if (!games.length) {
-    gamesEl.innerHTML = '<section class="card"><p class="small">저장된 게임이 없습니다.</p></section>';
+    gamesEl.innerHTML = '<section class="card"><p class="small">저장된 조사가 없습니다.</p></section>';
     return;
   }
 
-  const hasActiveSession = games.some((game) => game.sessions.some((s) => s.status === 'active'));
-
+  const hasActiveSession = games.some((game) => (game.sessions || []).some((s) => s.status === 'active'));
   gamesEl.innerHTML = games.map((game) => gameTemplate(game, hasActiveSession)).join('');
-
-  const activeBanner = hasActiveSession
-    ? `<section class="card"><p class="small">현재 진행 중 세션이 있습니다. HOST: <a class="session-link" href="${hostRunUrl()}" target="_blank">${hostRunUrl()}</a> / PARTICIPANT: <a class="session-link" href="${participantJoinUrl()}" target="_blank">${participantJoinUrl()}</a></p></section>`
-    : '';
-
-  if (activeBanner) {
-    gamesEl.insertAdjacentHTML('afterbegin', activeBanner);
-  }
 }
 
 async function refreshGames() {
   try {
-    const games = await fetchGames();
-    renderGames(games);
+    const data = await window.AorBApi.listGames();
+    renderGames(data.games || []);
   } catch (error) {
     statusEl.textContent = error.message;
     log(`오류: ${error.message}`);
@@ -122,20 +145,26 @@ async function refreshGames() {
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
-  const formData = new FormData(form);
-  const title = String(formData.get('title')).trim();
-  const optionA = String(formData.get('optionA')).trim();
-  const optionB = String(formData.get('optionB')).trim();
+  const title = String(new FormData(form).get('title')).trim();
+  const options = [...optionInputsEl.querySelectorAll('input[name="options"]')]
+    .map((el) => el.value.trim())
+    .filter(Boolean);
+
+  if (options.length < 2 || options.length > 5) {
+    statusEl.textContent = '선택지는 최소 2개, 최대 5개까지 입력해 주세요.';
+    return;
+  }
 
   try {
-    await window.AorBApi.createGame(title, optionA, optionB);
+    await window.AorBApi.createGame(title, options);
     form.reset();
-    statusEl.textContent = '게임이 저장되었습니다.';
-    log(`게임 저장 완료: ${title}`);
+    initializeOptionInputs();
+    statusEl.textContent = '조사가 저장되었습니다.';
+    log(`조사 저장 완료: ${title}`);
     await refreshGames();
   } catch (error) {
     statusEl.textContent = error.message;
-    log(`게임 저장 실패: ${error.message}`);
+    log(`조사 저장 실패: ${error.message}`);
   }
 });
 
@@ -151,17 +180,17 @@ gamesEl.addEventListener('click', async (event) => {
     }
 
     if (action === 'delete-session') {
-      const yes = window.confirm('이 세션을 삭제할까요? 투표 기록이 함께 삭제됩니다.');
+      const yes = window.confirm('이 세션을 삭제할까요? 응답 기록이 함께 삭제됩니다.');
       if (!yes) return;
       await window.AorBApi.deleteSession(button.dataset.sessionId);
       log(`세션 삭제 완료 (sessionId: ${button.dataset.sessionId})`);
     }
 
     if (action === 'delete-game') {
-      const yes = window.confirm('이 게임과 모든 세션/투표 기록을 삭제할까요?');
+      const yes = window.confirm('이 조사와 모든 세션/응답 기록을 삭제할까요?');
       if (!yes) return;
       await window.AorBApi.deleteGame(button.dataset.gameId);
-      log(`게임 삭제 완료 (gameId: ${button.dataset.gameId})`);
+      log(`조사 삭제 완료 (gameId: ${button.dataset.gameId})`);
     }
 
     await refreshGames();
@@ -181,6 +210,7 @@ saveApiConfigBtn.addEventListener('click', async () => {
 });
 
 apiBaseInputEl.value = window.AorBConfig.getApiBaseUrl();
+initializeOptionInputs();
 log('CLIENT 페이지 준비 완료');
 refreshEntryLinks();
 refreshGames();
