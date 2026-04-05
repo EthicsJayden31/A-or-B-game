@@ -2,12 +2,10 @@ const testForm = document.getElementById('testGameForm');
 const currentSessionEl = document.getElementById('currentSession');
 const participantLinkEl = document.getElementById('participantLink');
 const hostSessionLinkEl = document.getElementById('hostSessionLink');
-const simulateVotesBtn = document.getElementById('simulateVotes');
 const closeSessionBtn = document.getElementById('closeSession');
-const resultAEl = document.getElementById('resultA');
-const resultBEl = document.getElementById('resultB');
-const resultSummaryEl = document.getElementById('resultSummary');
+const resultListEl = document.getElementById('resultList');
 const logsEl = document.getElementById('logs');
+const loadingOverlayEl = createLoadingOverlay();
 
 let currentGame;
 let currentSession;
@@ -15,6 +13,24 @@ let currentSession;
 function log(message) {
   const now = new Date().toLocaleTimeString('ko-KR');
   logsEl.textContent = `[${now}] ${message}\n${logsEl.textContent}`.slice(0, 10000);
+}
+
+function createLoadingOverlay() {
+  const overlay = document.createElement('div');
+  overlay.className = 'loading-overlay hidden';
+  overlay.innerHTML = `
+    <div class="loading-box">
+      <span class="gear">⚙️</span>
+      <div class="loading-text">처리 중...</div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+function showLoading(show, text = '처리 중...') {
+  loadingOverlayEl.querySelector('.loading-text').textContent = text;
+  loadingOverlayEl.classList.toggle('hidden', !show);
 }
 
 function participantJoinUrl() {
@@ -31,113 +47,62 @@ function hostRunUrl() {
   return url.toString();
 }
 
-async function pollCurrentSession() {
-  if (!currentSession) return;
-
-  try {
-    const data = await window.AorBApi.getSession(currentSession.id);
-
-    if (data.session.status === 'closed') {
-      resultAEl.textContent = `${data.game.optionA}: ${data.session.votes.A}`;
-      resultBEl.textContent = `${data.game.optionB}: ${data.session.votes.B}`;
-      resultSummaryEl.textContent = `세션 종료 · 총 ${data.session.totalVotes}명 참여`;
-    } else {
-      resultAEl.textContent = '선택지 A: 비공개';
-      resultBEl.textContent = '선택지 B: 비공개';
-      resultSummaryEl.textContent = `진행 중 · 참여자 ${data.session.participantCount ?? 0}명`;
-    }
-  } catch (_error) {
-    // 무시
-  }
-}
-
-function ensureSession() {
-  if (!currentSession) {
-    throw new Error('먼저 테스트 게임/세션을 생성해 주세요.');
-  }
-}
-
 testForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const formData = new FormData(testForm);
-  const payload = {
-    title: String(formData.get('title')).trim(),
-    optionA: String(formData.get('optionA')).trim(),
-    optionB: String(formData.get('optionB')).trim(),
-  };
+  const title = String(formData.get('title')).trim();
+  const options = String(formData.get('optionsCsv'))
+    .split(',')
+    .map((text) => text.trim())
+    .filter(Boolean)
+    .slice(0, 5);
+
+  if (options.length < 2) {
+    log('선택지는 최소 2개 필요합니다.');
+    return;
+  }
 
   try {
-    const gameData = await window.AorBApi.createGame(payload.title, payload.optionA, payload.optionB);
+    showLoading(true, '세션 생성 중...');
+    const gameData = await window.AorBApi.createGame(title, options);
     currentGame = gameData.game;
-
     const sessionData = await window.AorBApi.startSession(currentGame.id);
     currentSession = sessionData.session;
 
-    const joinUrl = participantJoinUrl();
-    const hostUrl = hostRunUrl();
-    currentSessionEl.textContent = `세션 생성 완료 · Game ID ${currentGame.id} / Session ID ${currentSession.id}`;
-    participantLinkEl.href = joinUrl;
-    participantLinkEl.target = '_blank';
-    participantLinkEl.rel = 'noreferrer';
-    participantLinkEl.textContent = `참여 링크 열기: ${joinUrl}`;
-
-    hostSessionLinkEl.href = hostUrl;
-    hostSessionLinkEl.target = '_blank';
-    hostSessionLinkEl.rel = 'noreferrer';
-    hostSessionLinkEl.textContent = `HOST 세션 진행 링크 열기: ${hostUrl}`;
-
-    resultAEl.textContent = '선택지 A: 비공개';
-    resultBEl.textContent = '선택지 B: 비공개';
-    resultSummaryEl.textContent = '세션이 시작되었습니다. 진행 중에는 결과가 비공개입니다.';
+    currentSessionEl.textContent = `세션 생성 완료 · ${currentSession.id}`;
+    participantLinkEl.href = participantJoinUrl();
+    participantLinkEl.textContent = `참여 링크: ${participantLinkEl.href}`;
+    hostSessionLinkEl.href = hostRunUrl();
+    hostSessionLinkEl.textContent = `HOST 링크: ${hostSessionLinkEl.href}`;
+    resultListEl.textContent = '세션 진행 중입니다.';
     log(`테스트 세션 생성 완료 (${currentSession.id})`);
+    showLoading(false);
   } catch (error) {
     log(`오류: ${error.message}`);
-  }
-});
-
-simulateVotesBtn.addEventListener('click', async () => {
-  try {
-    ensureSession();
-    const countA = Number(document.getElementById('countA').value) || 0;
-    const countB = Number(document.getElementById('countB').value) || 0;
-
-    const tasks = [];
-    for (let i = 0; i < countA; i += 1) {
-      tasks.push(window.AorBApi.vote(
-        currentSession.id,
-        'A',
-        `sim-A-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 8)}`,
-      ));
-    }
-
-    for (let i = 0; i < countB; i += 1) {
-      tasks.push(window.AorBApi.vote(
-        currentSession.id,
-        'B',
-        `sim-B-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 8)}`,
-      ));
-    }
-
-    await Promise.all(tasks);
-    log(`가상 투표 완료 - A ${countA}, B ${countB}`);
-    await pollCurrentSession();
-  } catch (error) {
-    log(`오류: ${error.message}`);
+    showLoading(false);
   }
 });
 
 closeSessionBtn.addEventListener('click', async () => {
+  if (!currentSession) {
+    log('먼저 세션을 생성해 주세요.');
+    return;
+  }
+
   try {
-    ensureSession();
-    const data = await window.AorBApi.closeSession(currentSession.id);
-    resultAEl.textContent = `${data.optionA}: ${data.votes.A}`;
-    resultBEl.textContent = `${data.optionB}: ${data.votes.B}`;
-    resultSummaryEl.textContent = `세션 종료 · 총 ${data.totalVotes}명 참여`;
-    log(`세션 종료 완료 - 최종 ${data.optionA} ${data.votes.A}, ${data.optionB} ${data.votes.B}`);
+    showLoading(true, '세션 종료 중...');
+    await window.AorBApi.closeSession(currentSession.id);
+    const data = await window.AorBApi.getSession(currentSession.id);
+    resultListEl.innerHTML = (data.game.options || []).map((opt) => {
+      const count = data.session.votes?.[opt.id] ?? 0;
+      return `<div>${opt.text}: ${count}</div>`;
+    }).join('');
+    log('세션 종료 완료');
+    showLoading(false);
   } catch (error) {
     log(`오류: ${error.message}`);
+    showLoading(false);
   }
 });
 
-log('테스트 페이지 준비 완료. Apps Script URL은 CLIENT 페이지에서 저장해 주세요.');
-setInterval(pollCurrentSession, 5000);
+log('테스트 페이지 준비 완료.');

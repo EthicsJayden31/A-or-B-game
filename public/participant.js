@@ -1,19 +1,21 @@
 const params = new URLSearchParams(window.location.search);
 const queryApi = params.get('api');
-if (queryApi) {
-  window.AorBConfig.setApiBaseUrl(queryApi);
-}
+if (queryApi) window.AorBConfig.setApiBaseUrl(queryApi);
 
 const titleEl = document.getElementById('title');
 const optionsEl = document.getElementById('options');
 const messageEl = document.getElementById('message');
 const choiceAreaEl = document.getElementById('choiceArea');
-const choiceAEl = document.getElementById('choiceA');
-const choiceBEl = document.getElementById('choiceB');
+const choiceButtonsEl = document.getElementById('choiceButtons');
+const reasonInputEl = document.getElementById('reasonInput');
+const submitVoteBtn = document.getElementById('submitVote');
 
 let currentSessionId = '';
 let localSession;
+let selectedOptionId = '';
 let isSubmitting = false;
+let toastTimer;
+const loadingOverlayEl = createLoadingOverlay();
 
 function setMessage(text) {
   messageEl.innerText = text;
@@ -23,20 +25,36 @@ function showChoices(show) {
   choiceAreaEl.classList.toggle('hidden', !show);
 }
 
-function setChoiceState(selected) {
-  choiceAEl.classList.toggle('selected', selected === 'A');
-  choiceBEl.classList.toggle('selected', selected === 'B');
-  const disabled = !!selected || isSubmitting;
-  choiceAEl.disabled = disabled;
-  choiceBEl.disabled = disabled;
+function showLoading(show, text = '처리 중...') {
+  loadingOverlayEl.querySelector('.loading-text').textContent = text;
+  loadingOverlayEl.classList.toggle('hidden', !show);
 }
 
-function showClosedResult(payload) {
-  const total = payload.totalVotes || 0;
-  const aPercent = total ? Math.round((payload.votes.A / total) * 100) : 0;
-  const bPercent = total ? Math.round((payload.votes.B / total) * 100) : 0;
-  setMessage(`투표가 종료되었습니다. 결과 공개!\n${payload.optionA}: ${payload.votes.A}명 (${aPercent}%)\n${payload.optionB}: ${payload.votes.B}명 (${bPercent}%)`);
-  showChoices(false);
+function createLoadingOverlay() {
+  const overlay = document.createElement('div');
+  overlay.className = 'loading-overlay hidden';
+  overlay.innerHTML = `
+    <div class="loading-box">
+      <span class="gear">⚙️</span>
+      <div class="loading-text">처리 중...</div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+function showToast(message) {
+  const existing = document.getElementById('floatingToast');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.id = 'floatingToast';
+  toast.className = 'toast';
+  toast.textContent = message;
+  document.body.appendChild(toast);
+
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.remove(), 1200);
 }
 
 function getParticipantToken(sessionId) {
@@ -49,12 +67,9 @@ function getParticipantToken(sessionId) {
 
 function findCurrentSessionFromGames(games) {
   let latestClosed = null;
-
   for (const game of games) {
     const active = (game.sessions || []).find((session) => session.status === 'active');
-    if (active) {
-      return { game, session: active };
-    }
+    if (active) return { game, session: active };
 
     for (const session of (game.sessions || [])) {
       if (session.status === 'closed') {
@@ -64,12 +79,48 @@ function findCurrentSessionFromGames(games) {
       }
     }
   }
-
   return latestClosed;
 }
 
-async function loadSession() {
+function renderChoices(options) {
+  choiceButtonsEl.innerHTML = '';
+  options.forEach((opt, idx) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'choice';
+    button.textContent = `${idx + 1}. ${opt.text}`;
+    button.dataset.optionId = opt.id;
+    button.addEventListener('click', () => {
+      selectedOptionId = opt.id;
+      for (const other of choiceButtonsEl.querySelectorAll('.choice')) {
+        const isSelected = other.dataset.optionId === opt.id;
+        other.classList.toggle('selected', isSelected);
+        other.classList.toggle('dimmed', !isSelected);
+      }
+      showToast(`선택됨: ${opt.text}`);
+    });
+    choiceButtonsEl.appendChild(button);
+  });
+}
+
+function toPercent(value, total) {
+  return total ? Math.round((value / total) * 100) : 0;
+}
+
+function showClosedResult(data) {
+  const lines = (data.game.options || []).map((opt) => {
+    const count = data.session.votes?.[opt.id] ?? 0;
+    const pct = toPercent(count, data.session.totalVotes || 0);
+    return `${opt.text}: ${count}명 (${pct}%)`;
+  });
+
+  setMessage(`투표가 종료되었습니다.\n${lines.join('\n')}`);
+  showChoices(false);
+}
+
+async function loadSession(silent = false) {
   try {
+    if (!silent) showLoading(true, '세션 동기화 중...');
     const gamesData = await window.AorBApi.listGames();
     const current = findCurrentSessionFromGames(gamesData.games || []);
 
@@ -79,6 +130,7 @@ async function loadSession() {
       optionsEl.textContent = '';
       setMessage('HOST가 세션을 시작하면 자동으로 참여 화면이 열립니다.');
       showChoices(false);
+      if (!silent) showLoading(false);
       return;
     }
 
@@ -87,48 +139,65 @@ async function loadSession() {
     localSession = data;
 
     titleEl.textContent = data.game.title;
-    optionsEl.textContent = `A: ${data.game.optionA} / B: ${data.game.optionB}`;
-    choiceAEl.textContent = `A 선택 · ${data.game.optionA}`;
-    choiceBEl.textContent = `B 선택 · ${data.game.optionB}`;
+    optionsEl.textContent = `선택지: ${(data.game.options || []).map((o) => o.text).join(' / ')}`;
 
     if (data.session.status === 'closed') {
-      showClosedResult({ ...data.session, optionA: data.game.optionA, optionB: data.game.optionB });
+      showClosedResult(data);
+      if (!silent) showLoading(false);
       return;
     }
 
+    renderChoices(data.game.options || []);
     if (!isSubmitting) {
-      setChoiceState('');
-      setMessage('하나를 선택하고 HOST가 투표를 종료할 때까지 기다려 주세요.');
+      selectedOptionId = '';
+      reasonInputEl.value = '';
+      setMessage('선택지 1개를 고르고 이유를 작성한 뒤 제출해 주세요.');
     }
     showChoices(true);
+    if (!silent) showLoading(false);
   } catch (error) {
     titleEl.textContent = '세션을 불러오지 못했습니다.';
     setMessage(error.message);
     showChoices(false);
+    if (!silent) showLoading(false);
   }
 }
 
-async function sendVote(choice) {
+async function sendVote() {
   if (isSubmitting) return;
   if (!currentSessionId || !localSession || localSession.session.status !== 'active') return;
 
+  const reason = reasonInputEl.value.trim();
+  if (!selectedOptionId) {
+    setMessage('먼저 선택지를 골라 주세요.');
+    return;
+  }
+  if (!reason) {
+    setMessage('선택 이유를 반드시 입력해 주세요.');
+    return;
+  }
+
   isSubmitting = true;
-  setChoiceState(choice);
-  setMessage('선택을 저장 중입니다...');
+  submitVoteBtn.disabled = true;
+  setMessage('응답을 저장 중입니다...');
+  showLoading(true, '응답 제출 중...');
 
   try {
     const token = getParticipantToken(currentSessionId);
-    await window.AorBApi.vote(currentSessionId, choice, token);
-    setMessage(`✅ ${choice === 'A' ? localSession.game.optionA : localSession.game.optionB} 선택이 저장되었습니다. HOST가 결과를 공개할 때까지 대기해 주세요.`);
+    await window.AorBApi.vote(currentSessionId, selectedOptionId, reason, token);
+    setMessage('✅ 응답이 저장되었습니다. HOST가 결과를 공개할 때까지 기다려 주세요.');
+    showToast('제출 완료!');
+    showChoices(false);
+    showLoading(false);
   } catch (error) {
     isSubmitting = false;
-    setChoiceState('');
+    submitVoteBtn.disabled = false;
     setMessage(error.message);
+    showLoading(false);
   }
 }
 
-choiceAEl.addEventListener('click', () => sendVote('A'));
-choiceBEl.addEventListener('click', () => sendVote('B'));
+submitVoteBtn.addEventListener('click', sendVote);
 
 loadSession();
-setInterval(loadSession, 5000);
+setInterval(() => loadSession(true), 5000);

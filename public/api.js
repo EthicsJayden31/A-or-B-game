@@ -9,9 +9,7 @@
 
   async function call(action, payload = {}) {
     const baseUrl = window.AorBConfig?.getApiBaseUrl();
-    if (!baseUrl) {
-      throw new Error('Google Apps Script Web App URL을 먼저 설정해 주세요.');
-    }
+    if (!baseUrl) throw new Error('Google Apps Script Web App URL을 먼저 설정해 주세요.');
 
     let response;
     try {
@@ -42,8 +40,8 @@
     listGames() {
       return call('listGames');
     },
-    createGame(title, optionA, optionB) {
-      return call('createGame', { title, optionA, optionB });
+    createGame(title, options) {
+      return call('createGame', { title, options });
     },
     deleteGame(gameId) {
       return call('deleteGame', { gameId });
@@ -60,8 +58,8 @@
     getSession(sessionId) {
       return call('getSession', { sessionId });
     },
-    vote(sessionId, choice, token) {
-      return call('vote', { sessionId, choice, token });
+    vote(sessionId, optionId, reason, token) {
+      return call('vote', { sessionId, optionId, reason, token });
     },
   };
 })();
