@@ -314,6 +314,7 @@ function getSession(body) {
   const options = parseOptionsJson_(game.optionsJson);
   const sessionVotes = voteRows.filter((v) => String(v.sessionId) === sessionId);
   const summary = fillVoteSummary_(options, buildVoteSummary_(sessionVotes));
+  const isClosed = String(session.status) === 'closed';
 
   return {
     game: {
@@ -324,10 +325,10 @@ function getSession(body) {
     session: {
       id: session.id,
       status: session.status,
-      votes: summary,
-      totalVotes: sessionVotes.length,
+      votes: isClosed ? summary : null,
+      totalVotes: isClosed ? sessionVotes.length : null,
       participantCount: sessionVotes.length,
-      reasonCloudByOption: buildReasonCloudByOption_(sessionVotes, options),
+      reasonCloudByOption: isClosed ? buildReasonCloudByOption_(sessionVotes, options) : null,
       createdAt: session.createdAt,
       closedAt: session.closedAt || null,
     },
