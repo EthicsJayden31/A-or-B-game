@@ -3,15 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>A-or-B CLIENT</title>
+  <title>선택 비교 조사 CLIENT</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
   <div class="container stack">
-    <h1>A or B CLIENT (설계/관리)</h1>
-    <p class="small">게임과 세션을 설계/관리합니다. 실제 진행은 HOST 페이지에서 수행하세요.</p>
+    <h1>다중 선택 + 사유 워드클라우드 조사</h1>
+    <p class="small">설문 주제와 2~5개 선택지를 만들고, HOST/PARTICIPANT 페이지로 진행하세요.</p>
+
     <div class="grid grid-2">
-      <a class="session-link" href="./test.html" target="_blank" rel="noreferrer">테스트 페이지 열기</a>
       <a id="hostEntryLink" class="session-link" href="./host.html" target="_blank" rel="noreferrer">HOST 페이지 열기(자동 연결)</a>
       <a id="participantEntryLink" class="session-link" href="./participant.html" target="_blank" rel="noreferrer">PARTICIPANT 페이지 열기(자동 연결)</a>
     </div>
@@ -25,23 +25,18 @@
     </section>
 
     <section class="card stack">
-      <h2>새 게임 설계</h2>
-      <form id="createGameForm" class="grid grid-2">
+      <h2>새 조사 설계</h2>
+      <form id="createGameForm" class="stack">
         <div>
-          <label for="title">제목</label>
-          <input id="title" name="title" maxlength="80" required placeholder="예: AI는 숙제에 도움이 된다" />
+          <label for="title">주제</label>
+          <input id="title" name="title" maxlength="80" required placeholder="예: 이번 워크숍 점심 메뉴는?" />
         </div>
-        <div>
-          <label for="optionA">선택지 A</label>
-          <input id="optionA" name="optionA" maxlength="50" required placeholder="예: 찬성" />
+        <div class="stack">
+          <label>선택지 (최소 2개 / 최대 5개)</label>
+          <div id="optionInputs" class="stack"></div>
+          <button id="addOption" type="button" class="ghost">선택지 추가</button>
         </div>
-        <div>
-          <label for="optionB">선택지 B</label>
-          <input id="optionB" name="optionB" maxlength="50" required placeholder="예: 반대" />
-        </div>
-        <div style="display:flex; align-items:end;">
-          <button class="primary" type="submit">게임 저장</button>
-        </div>
+        <button class="primary" type="submit">조사 저장</button>
       </form>
       <p id="status" class="small"></p>
     </section>
@@ -54,7 +49,6 @@
     </section>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <script src="./config.js"></script>
   <script src="./api.js"></script>
   <script src="./client.js"></script>
