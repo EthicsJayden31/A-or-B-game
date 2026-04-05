@@ -9,10 +9,10 @@
 ## 1) 빠른 시작 링크
 
 - 서비스 홈(최초 페이지): https://ethicsjayden31.github.io/A-or-B-game/
-- CLIENT: https://ethicsjayden31.github.io/A-or-B-game/client.html
-- HOST: https://ethicsjayden31.github.io/A-or-B-game/host.html
-- PARTICIPANT: https://ethicsjayden31.github.io/A-or-B-game/participant.html
-- TEST: https://ethicsjayden31.github.io/A-or-B-game/test.html
+- CLIENT: https://ethicsjayden31.github.io/A-or-B-game/public/client.html
+- HOST: https://ethicsjayden31.github.io/A-or-B-game/public/host.html
+- PARTICIPANT: https://ethicsjayden31.github.io/A-or-B-game/public/participant.html
+- TEST: https://ethicsjayden31.github.io/A-or-B-game/public/test.html
 
 > 홈 페이지에서도 위 4개 페이지로 이동할 수 있는 링크를 제공합니다.
 
