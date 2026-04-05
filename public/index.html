@@ -2,8 +2,38 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="refresh" content="0; url=./client.html" />
-  <title>Redirecting...</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Multi-Option Survey 홈</title>
+  <link rel="stylesheet" href="./styles.css" />
 </head>
-<body></body>
+<body>
+  <div class="container stack">
+    <section class="card stack">
+      <h1>다중 선택 + 사유 워드클라우드 설문 앱</h1>
+      <p class="small">
+        이 페이지는 처음 접속한 사용자를 위한 시작 화면입니다. 아래 버튼으로 원하는 역할 페이지로 이동하세요.
+      </p>
+    </section>
+
+    <section class="card stack">
+      <h2>페이지 바로가기</h2>
+      <div class="grid grid-2">
+        <a class="session-link" href="./client.html">CLIENT (설문 설계/세션 관리)</a>
+        <a class="session-link" href="./host.html">HOST (진행/종료 및 결과 공개)</a>
+        <a class="session-link" href="./participant.html">PARTICIPANT (참여자 응답)</a>
+        <a class="session-link" href="./test.html">TEST (빠른 동작 확인)</a>
+      </div>
+    </section>
+
+    <section class="card stack">
+      <h2>처음 사용하는 경우 추천 순서</h2>
+      <ol class="small" style="margin:0; padding-left:1.2rem; display:grid; gap:0.4rem;">
+        <li><strong>CLIENT</strong>에서 Apps Script URL을 저장합니다.</li>
+        <li>CLIENT에서 설문(선택지 2~5개)을 만들고 세션을 시작합니다.</li>
+        <li>참여자에게 <strong>PARTICIPANT</strong> 링크를 공유합니다.</li>
+        <li><strong>HOST</strong>에서 참여자 수를 보다가 종료 후 결과를 확인합니다.</li>
+      </ol>
+    </section>
+  </div>
+</body>
 </html>
