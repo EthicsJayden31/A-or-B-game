@@ -327,6 +327,7 @@ function getSession(body) {
       votes: summary,
       totalVotes: sessionVotes.length,
       participantCount: sessionVotes.length,
+      reasonsByOption: buildReasonsByOption_(sessionVotes, options),
       reasonCloudByOption: buildReasonCloudByOption_(sessionVotes, options),
       createdAt: session.createdAt,
       closedAt: session.closedAt || null,
@@ -392,6 +393,21 @@ function buildReasonCloudByOption_(voteRows, options) {
       .map((word) => ({ word: word, count: map[word] }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 20);
+  });
+
+  return out;
+}
+
+function buildReasonsByOption_(voteRows, options) {
+  const out = {};
+  (options || []).forEach((opt) => { out[opt.id] = []; });
+
+  voteRows.forEach((vote) => {
+    const optionId = String(vote.optionId || '');
+    const reason = String(vote.reason || '').trim();
+    if (!reason) return;
+    if (!out[optionId]) out[optionId] = [];
+    out[optionId].push(reason);
   });
 
   return out;
