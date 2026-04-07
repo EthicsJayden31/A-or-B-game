@@ -17,6 +17,38 @@ let isSubmitting = false;
 let toastTimer;
 const loadingOverlayEl = createLoadingOverlay();
 
+function participantDraftKey(sessionId) {
+  return `aorb-participant-draft-${sessionId}`;
+}
+
+function saveDraft(sessionId) {
+  if (!sessionId) return;
+  const draft = {
+    selectedOptionId,
+    reason: reasonInputEl.value,
+  };
+  localStorage.setItem(participantDraftKey(sessionId), JSON.stringify(draft));
+}
+
+function restoreDraft(sessionId) {
+  if (!sessionId) return false;
+  const raw = localStorage.getItem(participantDraftKey(sessionId));
+  if (!raw) return false;
+  try {
+    const draft = JSON.parse(raw);
+    selectedOptionId = String(draft.selectedOptionId || '');
+    reasonInputEl.value = String(draft.reason || '');
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+function clearDraft(sessionId) {
+  if (!sessionId) return;
+  localStorage.removeItem(participantDraftKey(sessionId));
+}
+
 function setMessage(text) {
   messageEl.innerText = text;
 }
@@ -92,6 +124,7 @@ function renderChoices(options) {
     button.dataset.optionId = opt.id;
     button.addEventListener('click', () => {
       selectedOptionId = opt.id;
+      saveDraft(currentSessionId);
       for (const other of choiceButtonsEl.querySelectorAll('.choice')) {
         const isSelected = other.dataset.optionId === opt.id;
         other.classList.toggle('selected', isSelected);
@@ -99,6 +132,9 @@ function renderChoices(options) {
       }
       showToast(`선택됨: ${opt.text}`);
     });
+    const isSelected = selectedOptionId === opt.id;
+    button.classList.toggle('selected', isSelected);
+    button.classList.toggle('dimmed', Boolean(selectedOptionId) && !isSelected);
     choiceButtonsEl.appendChild(button);
   });
 }
@@ -135,6 +171,7 @@ async function loadSession(silent = false) {
     }
 
     const data = await window.AorBApi.getSession(current.session.id);
+    const previousSessionId = currentSessionId;
     currentSessionId = current.session.id;
     localSession = data;
 
@@ -149,8 +186,12 @@ async function loadSession(silent = false) {
 
     renderChoices(data.game.options || []);
     if (!isSubmitting) {
-      selectedOptionId = '';
-      reasonInputEl.value = '';
+      const isSameSession = previousSessionId === currentSessionId;
+      const restored = restoreDraft(currentSessionId);
+      if (!isSameSession && !restored) {
+        selectedOptionId = '';
+        reasonInputEl.value = '';
+      }
       setMessage('선택지 1개를 고르고 이유를 작성한 뒤 제출해 주세요.');
     }
     showChoices(true);
@@ -185,6 +226,7 @@ async function sendVote() {
   try {
     const token = getParticipantToken(currentSessionId);
     await window.AorBApi.vote(currentSessionId, selectedOptionId, reason, token);
+    clearDraft(currentSessionId);
     setMessage('✅ 응답이 저장되었습니다. HOST가 결과를 공개할 때까지 기다려 주세요.');
     showToast('제출 완료!');
     showChoices(false);
@@ -198,6 +240,7 @@ async function sendVote() {
 }
 
 submitVoteBtn.addEventListener('click', sendVote);
+reasonInputEl.addEventListener('input', () => saveDraft(currentSessionId));
 
 loadSession();
 setInterval(() => loadSession(true), 5000);
