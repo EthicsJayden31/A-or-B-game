@@ -2,10 +2,11 @@ const closeSessionBtn = document.getElementById('closeSession');
 const statusEl = document.getElementById('sessionState');
 const gameTitleEl = document.getElementById('gameTitle');
 const gameOptionsEl = document.getElementById('gameOptions');
+const hostOptionButtonsEl = document.getElementById('hostOptionButtons');
 const participantCountEl = document.getElementById('participantCount');
 const resultPanelEl = document.getElementById('resultPanel');
 const resultGridEl = document.getElementById('resultGrid');
-const reasonCloudAreaEl = document.getElementById('reasonCloudArea');
+const reasonListAreaEl = document.getElementById('reasonListArea');
 const resultSummaryEl = document.getElementById('resultSummary');
 const logsEl = document.getElementById('logs');
 const loadingOverlayEl = createLoadingOverlay();
@@ -38,12 +39,19 @@ function showLoading(show, text = '처리 중...') {
 function hideResultPanel() {
   resultPanelEl.classList.add('hidden');
   resultGridEl.innerHTML = '';
-  reasonCloudAreaEl.innerHTML = '';
+  reasonListAreaEl.innerHTML = '';
   resultSummaryEl.textContent = '-';
 }
 
 function toPercent(value, total) {
   return total ? Math.round((value / total) * 100) : 0;
+}
+
+function renderHostOptions(options) {
+  const safeOptions = options || [];
+  hostOptionButtonsEl.innerHTML = safeOptions
+    .map((opt, idx) => `<div class="host-option-pill">${idx + 1}. ${opt.text}</div>`)
+    .join('');
 }
 
 function renderResultCards(data) {
@@ -63,32 +71,40 @@ function renderResultCards(data) {
   }).join('');
 }
 
-function renderWordCloud(words, colorSeed) {
-  if (!words.length) return '<p class="small">사유 데이터가 없습니다.</p>';
-  const max = words.reduce((acc, item) => Math.max(acc, item.count), 1);
-  return `<div class="word-cloud">${words.map((item, idx) => {
-    const scale = 1 + ((item.count / max) * 1.2);
-    const hue = (colorSeed + idx * 17) % 360;
-    return `<span class="word-chip" style="font-size:${scale.toFixed(2)}rem; background:hsl(${hue} 95% 94%); color:hsl(${hue} 55% 32%);">${item.word} (${item.count})</span>`;
-  }).join('')}</div>`;
+function normalizeReasonText(reason) {
+  if (typeof reason === 'string') return reason.trim();
+  if (reason && typeof reason === 'object') {
+    if (typeof reason.reason === 'string') return reason.reason.trim();
+    if (typeof reason.text === 'string') return reason.text.trim();
+    if (typeof reason.content === 'string') return reason.content.trim();
+  }
+  return '';
 }
 
-function renderReasonCloud(data) {
+function renderReasons(data) {
   const options = data.game.options || [];
-  const clouds = data.session.reasonCloudByOption || {};
+  const reasonsByOption = data.session.reasonsByOption || {};
 
-  reasonCloudAreaEl.innerHTML = options.map((opt, idx) => `
+  reasonListAreaEl.innerHTML = options.map((opt) => {
+    const items = (reasonsByOption[opt.id] || [])
+      .map((reason) => normalizeReasonText(reason))
+      .filter(Boolean);
+    const listHtml = items.length
+      ? `<ol class="reason-list">${items.map((text) => `<li>${text}</li>`).join('')}</ol>`
+      : '<p class="small">등록된 개별 의견이 없습니다.</p>';
+    return `
     <div class="card stack">
       <h3>${opt.text}</h3>
-      ${renderWordCloud(clouds[opt.id] || [], 220 + idx * 45)}
+      ${listHtml}
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function showClosedResult(data) {
   resultPanelEl.classList.remove('hidden');
   renderResultCards(data);
-  renderReasonCloud(data);
+  renderReasons(data);
   resultSummaryEl.textContent = `총 ${data.session.totalVotes || 0}명 참여 · 투표 종료`;
 }
 
@@ -120,6 +136,7 @@ async function loadCurrentSession(silent = false) {
       closeSessionBtn.disabled = true;
       gameTitleEl.textContent = '진행/종료된 세션 없음';
       gameOptionsEl.textContent = 'CLIENT에서 세션을 시작해 주세요.';
+      hostOptionButtonsEl.innerHTML = '';
       statusEl.textContent = '진행 상태: 없음';
       participantCountEl.textContent = '실시간 참여자 수: 0명';
       hideResultPanel();
@@ -129,8 +146,10 @@ async function loadCurrentSession(silent = false) {
 
     const data = await window.AorBApi.getSession(current.session.id);
     currentSessionId = data.session.id;
+    const options = data.game.options || [];
     gameTitleEl.textContent = data.game.title;
-    gameOptionsEl.textContent = `선택지: ${(data.game.options || []).map((o) => o.text).join(' / ')}`;
+    gameOptionsEl.textContent = `선택지 ${options.length}개`;
+    renderHostOptions(options);
     participantCountEl.textContent = `실시간 참여자 수: ${data.session.participantCount ?? 0}명`;
 
     if (data.session.status === 'closed') {
