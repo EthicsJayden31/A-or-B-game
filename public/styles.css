@@ -112,6 +112,61 @@ button:disabled { cursor: not-allowed; opacity: 0.65; }
   opacity: 0.55;
 }
 
+.topic-board {
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  background: #f9fafb;
+  padding: 0.7rem;
+  display: grid;
+  gap: 0.55rem;
+}
+.topic-title {
+  border-radius: 10px;
+  background: #bdd0f3;
+  padding: 1rem;
+  text-align: center;
+  font-size: clamp(1.1rem, 2.6vw, 1.8rem);
+  font-weight: 800;
+  line-height: 1.35;
+}
+.topic-options {
+  display: grid;
+  gap: 0.5rem;
+}
+.topic-option-row {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  align-items: stretch;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #d1d5db;
+}
+.topic-option-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: #111827;
+  border-right: 1px solid #d1d5db;
+}
+.topic-option-text {
+  display: flex;
+  align-items: center;
+  padding: 0.85rem 1rem;
+  font-size: clamp(1rem, 2.2vw, 1.25rem);
+  line-height: 1.4;
+  font-weight: 600;
+  color: #111827;
+  white-space: pre-wrap;
+  word-break: keep-all;
+}
+.option-a { background: #d9ecd2; }
+.option-b { background: #f2dfc6; }
+.option-c { background: #dcd5eb; }
+.option-d { background: #fbe0d9; }
+.option-e { background: #d5ecf0; }
+
 .result-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -128,22 +183,36 @@ button:disabled { cursor: not-allowed; opacity: 0.65; }
 .result-value { font-size: 1.7rem; font-weight: 800; margin-top: 0.3rem; }
 .result-percent { color: var(--muted); font-size: 0.95rem; margin-top: 0.2rem; }
 
-.word-cloud {
-  border: 1px dashed #c7d2fe;
-  border-radius: 14px;
-  padding: 0.75rem;
-  min-height: 130px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem 0.6rem;
-  align-items: center;
+.reason-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.6rem;
+  max-height: 420px;
+  overflow: auto;
 }
-.word-chip {
-  padding: 0.2rem 0.45rem;
-  border-radius: 999px;
-  background: #eef2ff;
-  color: #3730a3;
+.reason-option-card h3 {
+  line-height: 1.35;
+}
+.reason-item {
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  border-radius: 10px;
+  padding: 0.75rem;
+}
+.reason-meta {
+  font-size: 0.8rem;
   font-weight: 700;
+  color: #4b5563;
+  margin-bottom: 0.35rem;
+}
+.reason-item p {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.5;
+  word-break: break-word;
+  white-space: pre-wrap;
 }
 
 .kpi { display: flex; gap: 0.6rem; flex-wrap: wrap; }
