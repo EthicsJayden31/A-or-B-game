@@ -16,16 +16,18 @@
 
     <section class="card stack" id="sessionPanel">
       <h2 id="gameTitle">세션 자동 확인 중...</h2>
-      <p class="small" id="gameOptions"></p>
-      <div id="hostOptionButtons" class="host-option-row"></div>
+      <div class="topic-board" id="hostTopicBoard">
+        <div class="topic-title" id="gameOptions">세션 주제를 불러오는 중...</div>
+        <div id="hostOptionButtons" class="topic-options"></div>
+      </div>
       <p class="small" id="sessionState">진행 상태: -</p>
       <p class="small" id="participantCount">실시간 참여자 수: -</p>
 
       <div id="resultPanel" class="stack hidden">
         <h3>최종 결과 비교</h3>
         <div id="resultGrid" class="result-grid"></div>
-        <h3>선택 이유 개별 의견</h3>
-        <div id="reasonListArea" class="grid grid-2"></div>
+        <h3>참여자 제출 의견</h3>
+        <div id="reasonListArea" class="stack"></div>
         <p class="small" id="resultSummary">-</p>
       </div>
 

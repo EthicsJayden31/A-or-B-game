@@ -47,10 +47,29 @@ function toPercent(value, total) {
   return total ? Math.round((value / total) * 100) : 0;
 }
 
+function escapeHtml(text) {
+  return String(text || '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
 function renderHostOptions(options) {
+  const optionPalette = ['option-a', 'option-b', 'option-c', 'option-d', 'option-e'];
   const safeOptions = options || [];
   hostOptionButtonsEl.innerHTML = safeOptions
-    .map((opt, idx) => `<div class="host-option-pill">${idx + 1}. ${opt.text}</div>`)
+    .map((opt, idx) => {
+      const label = String.fromCharCode(65 + idx);
+      const colorClass = optionPalette[idx % optionPalette.length];
+      return `
+        <div class="topic-option-row ${colorClass}">
+          <div class="topic-option-label">${label}</div>
+          <div class="topic-option-text">${escapeHtml(opt.text)}</div>
+        </div>
+      `;
+    })
     .join('');
 }
 
@@ -63,7 +82,7 @@ function renderResultCards(data) {
     const pct = toPercent(count, total);
     return `
       <div class="result-card">
-        <div class="result-title">${opt.text}</div>
+        <div class="result-title">${escapeHtml(opt.text)}</div>
         <div class="result-value">${count}</div>
         <div class="result-percent">${pct}%</div>
       </div>
@@ -84,17 +103,27 @@ function normalizeReasonText(reason) {
 function renderReasons(data) {
   const options = data.game.options || [];
   const reasonsByOption = data.session.reasonsByOption || {};
+  const optionPalette = ['option-a', 'option-b', 'option-c', 'option-d', 'option-e'];
 
-  reasonListAreaEl.innerHTML = options.map((opt) => {
+  reasonListAreaEl.innerHTML = options.map((opt, optionIdx) => {
+    const colorClass = optionPalette[optionIdx % optionPalette.length];
+    const label = String.fromCharCode(65 + optionIdx);
     const items = (reasonsByOption[opt.id] || [])
       .map((reason) => normalizeReasonText(reason))
       .filter(Boolean);
-    const listHtml = items.length
-      ? `<ol class="reason-list">${items.map((text) => `<li>${text}</li>`).join('')}</ol>`
-      : '<p class="small">등록된 개별 의견이 없습니다.</p>';
+    const listHtml = items.length ? `
+      <ul class="reason-list">
+        ${items.map((text, idx) => `
+          <li class="reason-item">
+            <div class="reason-meta">${label}-${idx + 1}</div>
+            <p>${escapeHtml(text)}</p>
+          </li>
+        `).join('')}
+      </ul>
+    ` : '<p class="small">등록된 개별 의견이 없습니다.</p>';
     return `
-    <div class="card stack">
-      <h3>${opt.text}</h3>
+    <div class="card stack reason-option-card ${colorClass}">
+      <h3>${label}. ${escapeHtml(opt.text)}</h3>
       ${listHtml}
     </div>
   `;
@@ -147,8 +176,8 @@ async function loadCurrentSession(silent = false) {
     const data = await window.AorBApi.getSession(current.session.id);
     currentSessionId = data.session.id;
     const options = data.game.options || [];
-    gameTitleEl.textContent = data.game.title;
-    gameOptionsEl.textContent = `선택지 ${options.length}개`;
+    gameTitleEl.textContent = '현재 세션 주제';
+    gameOptionsEl.textContent = data.game.title;
     renderHostOptions(options);
     participantCountEl.textContent = `실시간 참여자 수: ${data.session.participantCount ?? 0}명`;
 
