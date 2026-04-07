@@ -2,6 +2,7 @@ const closeSessionBtn = document.getElementById('closeSession');
 const statusEl = document.getElementById('sessionState');
 const gameTitleEl = document.getElementById('gameTitle');
 const gameOptionsEl = document.getElementById('gameOptions');
+const hostOptionButtonsEl = document.getElementById('hostOptionButtons');
 const participantCountEl = document.getElementById('participantCount');
 const resultPanelEl = document.getElementById('resultPanel');
 const resultGridEl = document.getElementById('resultGrid');
@@ -44,6 +45,13 @@ function hideResultPanel() {
 
 function toPercent(value, total) {
   return total ? Math.round((value / total) * 100) : 0;
+}
+
+function renderHostOptions(options) {
+  const safeOptions = options || [];
+  hostOptionButtonsEl.innerHTML = safeOptions
+    .map((opt, idx) => `<div class="host-option-pill">${idx + 1}. ${opt.text}</div>`)
+    .join('');
 }
 
 function renderResultCards(data) {
@@ -128,6 +136,7 @@ async function loadCurrentSession(silent = false) {
       closeSessionBtn.disabled = true;
       gameTitleEl.textContent = '진행/종료된 세션 없음';
       gameOptionsEl.textContent = 'CLIENT에서 세션을 시작해 주세요.';
+      hostOptionButtonsEl.innerHTML = '';
       statusEl.textContent = '진행 상태: 없음';
       participantCountEl.textContent = '실시간 참여자 수: 0명';
       hideResultPanel();
@@ -137,8 +146,10 @@ async function loadCurrentSession(silent = false) {
 
     const data = await window.AorBApi.getSession(current.session.id);
     currentSessionId = data.session.id;
+    const options = data.game.options || [];
     gameTitleEl.textContent = data.game.title;
-    gameOptionsEl.textContent = `선택지: ${(data.game.options || []).map((o) => o.text).join(' / ')}`;
+    gameOptionsEl.textContent = `선택지 ${options.length}개`;
+    renderHostOptions(options);
     participantCountEl.textContent = `실시간 참여자 수: ${data.session.participantCount ?? 0}명`;
 
     if (data.session.status === 'closed') {
