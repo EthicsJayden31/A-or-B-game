@@ -327,6 +327,8 @@ function getSession(body) {
       votes: summary,
       totalVotes: sessionVotes.length,
       participantCount: sessionVotes.length,
+      reasonsByOption: buildReasonsByOption_(sessionVotes, options),
+      reasonEntries: buildReasonEntries_(sessionVotes),
       reasonCloudByOption: buildReasonCloudByOption_(sessionVotes, options),
       createdAt: session.createdAt,
       closedAt: session.closedAt || null,
@@ -395,6 +397,31 @@ function buildReasonCloudByOption_(voteRows, options) {
   });
 
   return out;
+}
+
+function buildReasonsByOption_(voteRows, options) {
+  const out = {};
+  (options || []).forEach((opt) => { out[opt.id] = []; });
+
+  voteRows.forEach((vote) => {
+    const optionId = String(vote.optionId || '');
+    const reason = String(vote.reason || '').trim();
+    if (!reason) return;
+    if (!out[optionId]) out[optionId] = [];
+    out[optionId].push(reason);
+  });
+
+  return out;
+}
+
+function buildReasonEntries_(voteRows) {
+  return voteRows
+    .map((vote) => ({
+      optionId: String(vote.optionId || '').trim(),
+      reason: String(vote.reason || '').trim(),
+      createdAt: String(vote.createdAt || ''),
+    }))
+    .filter((entry) => entry.optionId && entry.reason);
 }
 
 function tokenizeReason_(text) {
