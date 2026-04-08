@@ -328,6 +328,7 @@ function getSession(body) {
       totalVotes: sessionVotes.length,
       participantCount: sessionVotes.length,
       reasonsByOption: buildReasonsByOption_(sessionVotes, options),
+      reasonEntries: buildReasonEntries_(sessionVotes),
       reasonCloudByOption: buildReasonCloudByOption_(sessionVotes, options),
       createdAt: session.createdAt,
       closedAt: session.closedAt || null,
@@ -411,6 +412,16 @@ function buildReasonsByOption_(voteRows, options) {
   });
 
   return out;
+}
+
+function buildReasonEntries_(voteRows) {
+  return voteRows
+    .map((vote) => ({
+      optionId: String(vote.optionId || '').trim(),
+      reason: String(vote.reason || '').trim(),
+      createdAt: String(vote.createdAt || ''),
+    }))
+    .filter((entry) => entry.optionId && entry.reason);
 }
 
 function tokenizeReason_(text) {

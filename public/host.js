@@ -100,17 +100,77 @@ function normalizeReasonText(reason) {
   return '';
 }
 
+function normalizeOptionKey(rawKey, optionIdByLabel) {
+  const key = String(rawKey || '').trim();
+  if (!key) return '';
+  if (optionIdByLabel[key]) return optionIdByLabel[key];
+  return key;
+}
+
+function buildReasonMap(data) {
+  const options = data.game.options || [];
+  const map = {};
+  options.forEach((opt) => { map[opt.id] = []; });
+
+  const optionIdByLabel = {};
+  options.forEach((opt, idx) => {
+    optionIdByLabel[String.fromCharCode(65 + idx)] = opt.id;
+    optionIdByLabel[String(idx + 1)] = opt.id;
+  });
+
+  const pushReason = (rawOptionId, rawReason) => {
+    const reasonText = normalizeReasonText(rawReason);
+    if (!reasonText) return;
+    const optionId = normalizeOptionKey(rawOptionId, optionIdByLabel);
+    if (!optionId) return;
+    if (!map[optionId]) map[optionId] = [];
+    map[optionId].push(reasonText);
+  };
+
+  const byOptionSources = [
+    data.session.reasonsByOption,
+    data.session.reasonByOption,
+    data.session.reasonListByOption,
+  ];
+  byOptionSources.forEach((source) => {
+    if (!source || typeof source !== 'object') return;
+    Object.keys(source).forEach((rawKey) => {
+      const list = Array.isArray(source[rawKey]) ? source[rawKey] : [];
+      list.forEach((item) => pushReason(rawKey, item));
+    });
+  });
+
+  const rowSources = [
+    data.session.reasonEntries,
+    data.session.responses,
+    data.session.submissions,
+    data.session.voteRows,
+    data.session.votesRaw,
+  ];
+  rowSources.forEach((rows) => {
+    if (!Array.isArray(rows)) return;
+    rows.forEach((row) => {
+      const rawOptionId = row.optionId || row.option || row.choice || row.answer || row.selectedOptionId;
+      const rawReason = row.reason || row.text || row.content || row.opinion || row.comment;
+      pushReason(rawOptionId, rawReason);
+    });
+  });
+
+  return map;
+}
+
 function renderReasons(data) {
   const options = data.game.options || [];
-  const reasonsByOption = data.session.reasonsByOption || {};
+  const reasonsByOption = buildReasonMap(data);
   const optionPalette = ['option-a', 'option-b', 'option-c', 'option-d', 'option-e'];
 
   reasonListAreaEl.innerHTML = options.map((opt, optionIdx) => {
     const colorClass = optionPalette[optionIdx % optionPalette.length];
     const label = String.fromCharCode(65 + optionIdx);
-    const items = (reasonsByOption[opt.id] || [])
-      .map((reason) => normalizeReasonText(reason))
-      .filter(Boolean);
+    const items = [...new Set(reasonsByOption[opt.id] || [])];
+    const noReasonMessage = (data.session.totalVotes || 0) > 0
+      ? '응답은 집계되었지만 표시 가능한 개별 의견 텍스트가 없습니다.'
+      : '등록된 개별 의견이 없습니다.';
     const listHtml = items.length ? `
       <ul class="reason-list">
         ${items.map((text, idx) => `
@@ -120,7 +180,7 @@ function renderReasons(data) {
           </li>
         `).join('')}
       </ul>
-    ` : '<p class="small">등록된 개별 의견이 없습니다.</p>';
+    ` : `<p class="small">${noReasonMessage}</p>`;
     return `
     <div class="card stack reason-option-card ${colorClass}">
       <h3>${label}. ${escapeHtml(opt.text)}</h3>
