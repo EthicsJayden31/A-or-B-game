@@ -139,18 +139,67 @@ function renderChoices(options) {
   });
 }
 
+
+function normalizeGameOptions(game) {
+  const rawOptions = Array.isArray(game?.options) ? game.options : [];
+  if (rawOptions.length) {
+    return rawOptions
+      .map((opt, idx) => {
+        if (opt && typeof opt === 'object') {
+          const id = String(opt.id || `opt${idx + 1}`);
+          const text = String(opt.text || '').trim();
+          return text ? { id, text } : null;
+        }
+        const text = String(opt || '').trim();
+        return text ? { id: `opt${idx + 1}`, text } : null;
+      })
+      .filter(Boolean);
+  }
+
+  const fallbackLabels = ['A', 'B', 'C', 'D', 'E'];
+  const fallback = fallbackLabels
+    .map((label, idx) => {
+      const text = String(game?.[`option${label}`] || '').trim();
+      if (!text) return null;
+      return { id: `opt${idx + 1}`, text };
+    })
+    .filter(Boolean);
+
+  return fallback;
+}
+
+function readVoteCount(session, option, index) {
+  const votes = session?.votes || {};
+  if (typeof votes !== 'object') return 0;
+
+  const keyCandidates = [
+    option?.id,
+    String.fromCharCode(65 + index),
+    String(index + 1),
+  ].filter(Boolean);
+
+  for (const key of keyCandidates) {
+    if (Object.prototype.hasOwnProperty.call(votes, key)) {
+      return Number(votes[key] || 0);
+    }
+  }
+
+  return 0;
+}
+
 function toPercent(value, total) {
   return total ? Math.round((value / total) * 100) : 0;
 }
 
-function showClosedResult(data) {
-  const lines = (data.game.options || []).map((opt) => {
-    const count = data.session.votes?.[opt.id] ?? 0;
+function showClosedResult(data, options) {
+  const lines = options.map((opt, idx) => {
+    const count = readVoteCount(data.session, opt, idx);
     const pct = toPercent(count, data.session.totalVotes || 0);
     return `${opt.text}: ${count}명 (${pct}%)`;
   });
 
-  setMessage(`투표가 종료되었습니다.\n${lines.join('\n')}`);
+  setMessage(`투표가 종료되었습니다.
+${lines.join('\n')}`);
   showChoices(false);
 }
 
@@ -171,20 +220,30 @@ async function loadSession(silent = false) {
     }
 
     const data = await window.AorBApi.getSession(current.session.id);
+    const options = normalizeGameOptions(data.game);
     const previousSessionId = currentSessionId;
     currentSessionId = current.session.id;
     localSession = data;
 
     titleEl.textContent = data.game.title;
-    optionsEl.textContent = `선택지: ${(data.game.options || []).map((o) => o.text).join(' / ')}`;
+    optionsEl.textContent = options.length
+      ? `선택지: ${options.map((o) => o.text).join(' / ')}`
+      : '선택지를 불러오지 못했습니다.';
 
     if (data.session.status === 'closed') {
-      showClosedResult(data);
+      showClosedResult(data, options);
       if (!silent) showLoading(false);
       return;
     }
 
-    renderChoices(data.game.options || []);
+    if (!options.length) {
+      setMessage('세션의 선택지 정보가 비어 있습니다. CLIENT에서 항목을 확인해 주세요.');
+      showChoices(false);
+      if (!silent) showLoading(false);
+      return;
+    }
+
+    renderChoices(options);
     if (!isSubmitting) {
       const isSameSession = previousSessionId === currentSessionId;
       const restored = restoreDraft(currentSessionId);
