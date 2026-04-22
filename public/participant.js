@@ -1,6 +1,7 @@
 const params = new URLSearchParams(window.location.search);
 const queryApi = params.get('api');
 if (queryApi) window.AorBConfig.setApiBaseUrl(queryApi);
+const querySessionId = String(params.get('session') || '').trim();
 
 const titleEl = document.getElementById('title');
 const optionsEl = document.getElementById('options');
@@ -206,8 +207,13 @@ ${lines.join('\n')}`);
 async function loadSession(silent = false) {
   try {
     if (!silent) showLoading(true, '세션 동기화 중...');
-    const gamesData = await window.AorBApi.listGames();
-    const current = findCurrentSessionFromGames(gamesData.games || []);
+    let current = null;
+    if (querySessionId) {
+      current = { session: { id: querySessionId } };
+    } else {
+      const gamesData = await window.AorBApi.listGames();
+      current = findCurrentSessionFromGames(gamesData.games || []);
+    }
 
     if (!current) {
       currentSessionId = '';
