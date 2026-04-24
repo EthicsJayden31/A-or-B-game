@@ -22,6 +22,7 @@ function route(body) {
 
   switch (action) {
     case 'listGames': return { ok: true, games: listGames() };
+    case 'getCurrentSession': return { ok: true, ...getCurrentSession(body) };
     case 'createGame': return { ok: true, game: createGame(body) };
     case 'deleteGame': deleteGame(body); return { ok: true };
     case 'startSession': return { ok: true, session: startSession(body) };
@@ -31,6 +32,27 @@ function route(body) {
     case 'vote': vote(body); return { ok: true };
     default: throw new Error('지원하지 않는 action입니다.');
   }
+}
+
+function getCurrentSession(body) {
+  const requestedSessionId = String(body.sessionId || '').trim();
+  if (requestedSessionId) return getSession({ sessionId: requestedSessionId });
+
+  const { sessions } = getSheets_();
+  const sessionRows = readRows_(sessions);
+  if (!sessionRows.length) return { current: null };
+
+  const normalizeTime = (value) => String(value || '');
+  const compareTimeDesc = (a, b) => normalizeTime(b.createdAt).localeCompare(normalizeTime(a.createdAt));
+  const sorted = [...sessionRows].sort(compareTimeDesc);
+
+  const active = sorted.find((s) => String(s.status) === 'active');
+  if (active) return getSession({ sessionId: String(active.id) });
+
+  const latestClosed = sorted.find((s) => String(s.status) === 'closed');
+  if (latestClosed) return getSession({ sessionId: String(latestClosed.id) });
+
+  return { current: null };
 }
 
 function getSheets_() {
