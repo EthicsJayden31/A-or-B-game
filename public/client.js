@@ -19,10 +19,11 @@ function formatDate(value) {
   return new Date(value).toLocaleString('ko-KR');
 }
 
-function participantJoinUrl() {
+function participantJoinUrl(sessionId = '') {
   const url = new URL('participant.html', window.location.href);
   const api = window.AorBConfig.getApiBaseUrl();
   if (api) url.searchParams.set('api', api);
+  if (sessionId) url.searchParams.set('session', sessionId);
   return url.toString();
 }
 
@@ -105,6 +106,10 @@ function sessionTemplate(session, gameOptions) {
     ? `<div class="kpi">${gameOptions.map((opt) => `<div>${opt.text}: ${session.votes?.[opt.id] ?? 0}</div>`).join('')}</div><p class="small">총 응답: ${session.totalVotes ?? 0}명</p>`
     : `<p class="small">참여자 수: ${session.participantCount ?? 0}명 · 결과 비공개</p>`;
 
+  const participantLink = session.status === 'active'
+    ? `<p class="small"><a href="${participantJoinUrl(session.id)}" target="_blank" rel="noopener">이 세션 참여 링크 열기</a></p>`
+    : '';
+
   return `
     <div class="card stack">
       <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem;">
@@ -112,6 +117,7 @@ function sessionTemplate(session, gameOptions) {
         <span class="small">세션 ID: ${session.id}</span>
       </div>
       <p class="small">시작: ${formatDate(session.createdAt)}</p>
+      ${participantLink}
       ${resultBlock}
       <button data-action="delete-session" data-session-id="${session.id}" class="danger">이 세션 삭제</button>
     </div>

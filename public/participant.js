@@ -1,6 +1,7 @@
 const params = new URLSearchParams(window.location.search);
 const queryApi = params.get('api');
 if (queryApi) window.AorBConfig.setApiBaseUrl(queryApi);
+const querySessionId = String(params.get('session') || '').trim();
 
 const titleEl = document.getElementById('title');
 const optionsEl = document.getElementById('options');
@@ -14,11 +15,16 @@ let currentSessionId = '';
 let localSession;
 let selectedOptionId = '';
 let isSubmitting = false;
+let hasSubmittedCurrentSession = false;
 let toastTimer;
 const loadingOverlayEl = createLoadingOverlay();
 
 function participantDraftKey(sessionId) {
   return `aorb-participant-draft-${sessionId}`;
+}
+
+function participantDoneKey(sessionId) {
+  return `aorb-participant-done-${sessionId}`;
 }
 
 function saveDraft(sessionId) {
@@ -47,6 +53,16 @@ function restoreDraft(sessionId) {
 function clearDraft(sessionId) {
   if (!sessionId) return;
   localStorage.removeItem(participantDraftKey(sessionId));
+}
+
+function markSessionSubmitted(sessionId) {
+  if (!sessionId) return;
+  localStorage.setItem(participantDoneKey(sessionId), '1');
+}
+
+function hasSubmittedSession(sessionId) {
+  if (!sessionId) return false;
+  return localStorage.getItem(participantDoneKey(sessionId)) === '1';
 }
 
 function setMessage(text) {
@@ -95,23 +111,6 @@ function getParticipantToken(sessionId) {
   const token = existing || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   if (!existing) localStorage.setItem(key, token);
   return token;
-}
-
-function findCurrentSessionFromGames(games) {
-  let latestClosed = null;
-  for (const game of games) {
-    const active = (game.sessions || []).find((session) => session.status === 'active');
-    if (active) return { game, session: active };
-
-    for (const session of (game.sessions || [])) {
-      if (session.status === 'closed') {
-        if (!latestClosed || String(session.closedAt || session.createdAt) > String(latestClosed.session.closedAt || latestClosed.session.createdAt)) {
-          latestClosed = { game, session };
-        }
-      }
-    }
-  }
-  return latestClosed;
 }
 
 function renderChoices(options) {
@@ -206,23 +205,30 @@ ${lines.join('\n')}`);
 async function loadSession(silent = false) {
   try {
     if (!silent) showLoading(true, '세션 동기화 중...');
-    const gamesData = await window.AorBApi.listGames();
-    const current = findCurrentSessionFromGames(gamesData.games || []);
+    const preferredSessionId = querySessionId || currentSessionId || '';
+    let data = null;
+    if (preferredSessionId) {
+      data = await window.AorBApi.getCurrentSession(preferredSessionId);
+    } else {
+      data = await window.AorBApi.getCurrentSession();
+    }
 
-    if (!current) {
+    if (!data || !data.session || !data.game) {
       currentSessionId = '';
       titleEl.textContent = '진행 중 세션이 없습니다.';
       optionsEl.textContent = '';
       setMessage('HOST가 세션을 시작하면 자동으로 참여 화면이 열립니다.');
       showChoices(false);
+      hasSubmittedCurrentSession = false;
+      submitVoteBtn.disabled = false;
       if (!silent) showLoading(false);
       return;
     }
 
-    const data = await window.AorBApi.getSession(current.session.id);
     const options = normalizeGameOptions(data.game);
     const previousSessionId = currentSessionId;
-    currentSessionId = current.session.id;
+    currentSessionId = data.session.id;
+    hasSubmittedCurrentSession = hasSubmittedSession(currentSessionId);
     localSession = data;
 
     titleEl.textContent = data.game.title;
@@ -244,6 +250,14 @@ async function loadSession(silent = false) {
     }
 
     renderChoices(options);
+    if (hasSubmittedCurrentSession) {
+      setMessage('이미 응답을 제출했습니다. HOST가 결과를 공개할 때까지 기다려 주세요.');
+      showChoices(false);
+      submitVoteBtn.disabled = true;
+      if (!silent) showLoading(false);
+      return;
+    }
+
     if (!isSubmitting) {
       const isSameSession = previousSessionId === currentSessionId;
       const restored = restoreDraft(currentSessionId);
@@ -253,12 +267,15 @@ async function loadSession(silent = false) {
       }
       setMessage('선택지 1개를 고르고 이유를 작성한 뒤 제출해 주세요.');
     }
+    submitVoteBtn.disabled = false;
     showChoices(true);
     if (!silent) showLoading(false);
   } catch (error) {
-    titleEl.textContent = '세션을 불러오지 못했습니다.';
-    setMessage(error.message);
-    showChoices(false);
+    if (!currentSessionId) {
+      titleEl.textContent = '세션을 불러오지 못했습니다.';
+      showChoices(false);
+    }
+    setMessage(`연결을 확인하는 중입니다: ${error.message}`);
     if (!silent) showLoading(false);
   }
 }
@@ -286,6 +303,9 @@ async function sendVote() {
     const token = getParticipantToken(currentSessionId);
     await window.AorBApi.vote(currentSessionId, selectedOptionId, reason, token);
     clearDraft(currentSessionId);
+    markSessionSubmitted(currentSessionId);
+    hasSubmittedCurrentSession = true;
+    isSubmitting = false;
     setMessage('✅ 응답이 저장되었습니다. HOST가 결과를 공개할 때까지 기다려 주세요.');
     showToast('제출 완료!');
     showChoices(false);

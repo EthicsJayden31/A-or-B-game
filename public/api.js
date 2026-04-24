@@ -15,8 +15,9 @@
     try {
       response = await fetch(baseUrl, {
         method: 'POST',
+        cache: 'no-store',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action, ...payload }),
+        body: JSON.stringify({ action, requestAt: Date.now(), ...payload }),
       });
     } catch (error) {
       throw new Error(buildNetworkHint(error));
@@ -57,6 +58,9 @@
     },
     getSession(sessionId) {
       return call('getSession', { sessionId });
+    },
+    getCurrentSession(sessionId = '') {
+      return call('getCurrentSession', { sessionId });
     },
     vote(sessionId, optionId, reason, token) {
       return call('vote', { sessionId, optionId, reason, token });

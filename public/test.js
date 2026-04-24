@@ -33,10 +33,11 @@ function showLoading(show, text = '처리 중...') {
   loadingOverlayEl.classList.toggle('hidden', !show);
 }
 
-function participantJoinUrl() {
+function participantJoinUrl(sessionId = '') {
   const url = new URL('participant.html', window.location.href);
   const api = window.AorBConfig.getApiBaseUrl();
   if (api) url.searchParams.set('api', api);
+  if (sessionId) url.searchParams.set('session', sessionId);
   return url.toString();
 }
 
@@ -70,7 +71,7 @@ testForm.addEventListener('submit', async (event) => {
     currentSession = sessionData.session;
 
     currentSessionEl.textContent = `세션 생성 완료 · ${currentSession.id}`;
-    participantLinkEl.href = participantJoinUrl();
+    participantLinkEl.href = participantJoinUrl(currentSession.id);
     participantLinkEl.textContent = `참여 링크: ${participantLinkEl.href}`;
     hostSessionLinkEl.href = hostRunUrl();
     hostSessionLinkEl.textContent = `HOST 링크: ${hostSessionLinkEl.href}`;
