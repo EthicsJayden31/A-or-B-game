@@ -4,7 +4,6 @@ if (queryApi) window.AorBConfig.setApiBaseUrl(queryApi);
 const querySessionId = String(params.get('session') || '').trim();
 
 const titleEl = document.getElementById('title');
-const optionsEl = document.getElementById('options');
 const messageEl = document.getElementById('message');
 const choiceAreaEl = document.getElementById('choiceArea');
 const choiceButtonsEl = document.getElementById('choiceButtons');
@@ -114,17 +113,24 @@ function getParticipantToken(sessionId) {
 }
 
 function renderChoices(options) {
+  const optionPalette = ['option-a', 'option-b', 'option-c', 'option-d', 'option-e'];
   choiceButtonsEl.innerHTML = '';
   options.forEach((opt, idx) => {
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = 'choice';
-    button.textContent = `${idx + 1}. ${opt.text}`;
+    button.className = `participant-choice ${optionPalette[idx % optionPalette.length]}`;
+    const label = String.fromCharCode(65 + idx);
+    button.innerHTML = `
+      <div class="topic-option-row ${optionPalette[idx % optionPalette.length]}">
+        <div class="topic-option-label">${label}</div>
+        <div class="topic-option-text">${label}: ${opt.text}</div>
+      </div>
+    `;
     button.dataset.optionId = opt.id;
     button.addEventListener('click', () => {
       selectedOptionId = opt.id;
       saveDraft(currentSessionId);
-      for (const other of choiceButtonsEl.querySelectorAll('.choice')) {
+      for (const other of choiceButtonsEl.querySelectorAll('.participant-choice')) {
         const isSelected = other.dataset.optionId === opt.id;
         other.classList.toggle('selected', isSelected);
         other.classList.toggle('dimmed', !isSelected);
@@ -216,7 +222,6 @@ async function loadSession(silent = false) {
     if (!data || !data.session || !data.game) {
       currentSessionId = '';
       titleEl.textContent = '진행 중 세션이 없습니다.';
-      optionsEl.textContent = '';
       setMessage('HOST가 세션을 시작하면 자동으로 참여 화면이 열립니다.');
       showChoices(false);
       hasSubmittedCurrentSession = false;
@@ -232,9 +237,6 @@ async function loadSession(silent = false) {
     localSession = data;
 
     titleEl.textContent = data.game.title;
-    optionsEl.textContent = options.length
-      ? `선택지: ${options.map((o) => o.text).join(' / ')}`
-      : '선택지를 불러오지 못했습니다.';
 
     if (data.session.status === 'closed') {
       showClosedResult(data, options);

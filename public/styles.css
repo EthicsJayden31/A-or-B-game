@@ -112,6 +112,30 @@ button:disabled { cursor: not-allowed; opacity: 0.65; }
   opacity: 0.55;
 }
 
+.participant-choice {
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  overflow: hidden;
+  text-align: left;
+  padding: 0;
+  color: #111827;
+  background: transparent;
+}
+.participant-choice .topic-option-label {
+  font-size: 2rem;
+}
+.participant-choice .topic-option-text {
+  font-weight: 700;
+  padding-right: 1.2rem;
+}
+.participant-choice.selected {
+  box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.2) inset;
+  border-color: #16a34a;
+}
+.participant-choice.dimmed {
+  opacity: 0.55;
+}
+
 .topic-board {
   border: 1px solid #d1d5db;
   border-radius: 12px;
