@@ -197,30 +197,12 @@ function showClosedResult(data) {
   resultSummaryEl.textContent = `총 ${data.session.totalVotes || 0}명 참여 · 투표 종료`;
 }
 
-function findCurrentSessionFromGames(games) {
-  let latestClosed = null;
-  for (const game of games) {
-    const active = (game.sessions || []).find((session) => session.status === 'active');
-    if (active) return { mode: 'active', game, session: active };
-
-    for (const session of (game.sessions || [])) {
-      if (session.status === 'closed') {
-        if (!latestClosed || String(session.closedAt || session.createdAt) > String(latestClosed.session.closedAt || latestClosed.session.createdAt)) {
-          latestClosed = { mode: 'closed', game, session };
-        }
-      }
-    }
-  }
-  return latestClosed;
-}
-
 async function loadCurrentSession(silent = false) {
   try {
     if (!silent) showLoading(true, '세션 동기화 중...');
-    const gamesData = await window.AorBApi.listGames();
-    const current = findCurrentSessionFromGames(gamesData.games || []);
+    const data = await window.AorBApi.getCurrentSession(currentSessionId);
 
-    if (!current) {
+    if (!data || !data.session || !data.game) {
       currentSessionId = '';
       closeSessionBtn.disabled = true;
       gameTitleEl.textContent = '진행/종료된 세션 없음';
@@ -233,7 +215,6 @@ async function loadCurrentSession(silent = false) {
       return;
     }
 
-    const data = await window.AorBApi.getSession(current.session.id);
     currentSessionId = data.session.id;
     const options = data.game.options || [];
     gameTitleEl.textContent = '현재 세션 주제';
